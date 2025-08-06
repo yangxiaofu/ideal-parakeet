@@ -59,47 +59,50 @@ export const Header: React.FC = () => {
   };
 
   return (
-    <header className="bg-white border-b border-slate-200/60 backdrop-blur-sm">
-      <div className="max-w-7xl mx-auto" style={{ paddingLeft: '4rem', paddingRight: '4rem' }}>
-        <div className="flex justify-between items-center py-6">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-800 tracking-tight">
-              Intrinsic Value Calculator
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Professional Equity Valuation
-            </p>
+    <header className="bg-white/80 backdrop-blur-md border-b border-gray-100">
+      <div className="max-w-6xl mx-auto px-8">
+        <div className="flex justify-between items-center h-20">
+          <div className="flex items-center space-x-2">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-2xl flex items-center justify-center">
+              <span className="text-white font-bold text-lg">IV</span>
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold text-gray-800 tracking-tight">
+                Intrinsic Value
+              </h1>
+              <p className="text-xs text-gray-500">
+                Professional Valuation Tool
+              </p>
+            </div>
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
             {user && (
               <>
-                <div className="group flex items-center space-x-3 px-4 py-2.5 bg-white rounded-xl border border-slate-200 hover:border-slate-300 hover:shadow-sm transition-all duration-200 cursor-pointer">
+                <div className="flex items-center space-x-3 px-4 py-2 bg-gray-50 rounded-2xl">
                   <div 
-                    className="w-10 h-10 rounded-full flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow duration-200"
+                    className="w-9 h-9 rounded-xl flex items-center justify-center"
                     style={avatarStyle}
                   >
-                    <span className="text-white font-semibold text-sm tracking-wide">
+                    <span className="text-white font-medium text-sm">
                       {initials}
                     </span>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-semibold text-slate-800 group-hover:text-slate-900 transition-colors">
+                  <div className="pr-2">
+                    <span className="text-sm font-medium text-gray-700 block">
                       {user.displayName || 'User'}
                     </span>
-                    <span className="text-xs text-slate-500 group-hover:text-slate-600 transition-colors">
+                    <span className="text-xs text-gray-400">
                       {user.email}
                     </span>
                   </div>
                 </div>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <button
                   onClick={handleLogout}
-                  className="hover:bg-red-50 hover:border-red-200 hover:text-red-600 border-slate-200 text-slate-600 transition-all duration-200"
+                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-all duration-200"
                 >
                   Sign Out
-                </Button>
+                </button>
               </>
             )}
           </div>
