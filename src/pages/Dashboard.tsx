@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Header } from '../components/layout/Header';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { DCFCalculator } from '../components/calculator/DCFCalculator';
 import { fmpApi } from '../services/fmpApi';
 import { formatCurrency, formatShares, formatEPS, formatYear } from '../utils/formatters';

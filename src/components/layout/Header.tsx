@@ -1,6 +1,5 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Button } from '../ui/button';
 
 export const Header: React.FC = () => {
   const { user, logout } = useAuth();
@@ -51,7 +50,7 @@ export const Header: React.FC = () => {
 
   const userIdentifier = user?.email || user?.displayName || 'user';
   const gradient = getAvatarGradient(userIdentifier);
-  const initials = getInitials(user?.displayName, user?.email);
+  const initials = getInitials(user?.displayName || null, user?.email || null);
 
   // Create inline gradient style
   const avatarStyle = {
