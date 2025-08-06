@@ -231,33 +231,121 @@ export const Dashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Historical Data - Minimal Table */}
+              {/* Historical Data - Transposed Table */}
               <div className="minimal-card overflow-hidden">
                 <h3 className="text-lg font-medium text-gray-700 mb-6">Financial History</h3>
                 <div className="overflow-x-auto -mx-8 px-8">
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-gray-100">
-                        <th className="text-left py-3 text-xs font-medium text-gray-500 uppercase">Year</th>
-                        <th className="text-right py-3 text-xs font-medium text-gray-500 uppercase">Revenue</th>
-                        <th className="text-right py-3 text-xs font-medium text-gray-500 uppercase">EPS</th>
-                        <th className="text-right py-3 text-xs font-medium text-gray-500 uppercase">FCF</th>
+                        <th className="text-left py-3 pr-4 text-xs font-medium text-gray-500 uppercase sticky left-0 bg-white">Metric</th>
+                        {companyData.incomeStatement.slice(0, 5).map((stmt) => (
+                          <th key={stmt.date} className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase min-w-[100px]">
+                            {formatYear(stmt.date)}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {companyData.incomeStatement.slice(0, 5).map((stmt, index) => (
-                        <tr key={stmt.date} className="border-b border-gray-50">
-                          <td className="py-3 text-sm text-gray-700">{formatYear(stmt.date)}</td>
-                          <td className="text-right py-3 text-sm font-medium text-gray-800">{formatCurrency(stmt.revenue)}</td>
-                          <td className="text-right py-3 text-sm font-medium text-gray-800">{formatEPS(stmt.eps)}</td>
-                          <td className="text-right py-3 text-sm font-medium text-gray-800">
-                            {companyData.cashFlowStatement[index] 
-                              ? formatCurrency(companyData.cashFlowStatement[index].freeCashFlow)
-                              : <span className="text-gray-400">-</span>
-                            }
+                      {/* Revenue Row */}
+                      <tr className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                        <td className="py-3 pr-4 text-sm font-medium text-gray-700 sticky left-0 bg-white">Revenue</td>
+                        {companyData.incomeStatement.slice(0, 5).map((stmt) => (
+                          <td key={stmt.date} className="text-right py-3 px-3 text-sm text-gray-800">
+                            {formatCurrency(stmt.revenue)}
                           </td>
-                        </tr>
-                      ))}
+                        ))}
+                      </tr>
+                      
+                      {/* Operating Income Row */}
+                      <tr className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                        <td className="py-3 pr-4 text-sm font-medium text-gray-700 sticky left-0 bg-white">Operating Income</td>
+                        {companyData.incomeStatement.slice(0, 5).map((stmt) => (
+                          <td key={stmt.date} className="text-right py-3 px-3 text-sm text-gray-800">
+                            {formatCurrency(stmt.operatingIncome)}
+                          </td>
+                        ))}
+                      </tr>
+                      
+                      {/* Net Income Row */}
+                      <tr className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                        <td className="py-3 pr-4 text-sm font-medium text-gray-700 sticky left-0 bg-white">Net Income</td>
+                        {companyData.incomeStatement.slice(0, 5).map((stmt) => (
+                          <td key={stmt.date} className="text-right py-3 px-3 text-sm text-gray-800">
+                            {formatCurrency(stmt.netIncome)}
+                          </td>
+                        ))}
+                      </tr>
+                      
+                      {/* EPS Row */}
+                      <tr className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                        <td className="py-3 pr-4 text-sm font-medium text-gray-700 sticky left-0 bg-white">EPS</td>
+                        {companyData.incomeStatement.slice(0, 5).map((stmt) => (
+                          <td key={stmt.date} className="text-right py-3 px-3 text-sm text-gray-800">
+                            {formatEPS(stmt.eps)}
+                          </td>
+                        ))}
+                      </tr>
+                      
+                      {/* Operating Cash Flow Row */}
+                      <tr className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                        <td className="py-3 pr-4 text-sm font-medium text-gray-700 sticky left-0 bg-white">Operating Cash Flow</td>
+                        {companyData.cashFlowStatement.slice(0, 5).map((cf) => (
+                          <td key={cf.date} className="text-right py-3 px-3 text-sm text-gray-800">
+                            {formatCurrency(cf.operatingCashFlow)}
+                          </td>
+                        ))}
+                      </tr>
+                      
+                      {/* Free Cash Flow Row */}
+                      <tr className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                        <td className="py-3 pr-4 text-sm font-medium text-gray-700 sticky left-0 bg-white">Free Cash Flow</td>
+                        {companyData.cashFlowStatement.slice(0, 5).map((cf) => (
+                          <td key={cf.date} className="text-right py-3 px-3 text-sm text-gray-800">
+                            {formatCurrency(cf.freeCashFlow)}
+                          </td>
+                        ))}
+                      </tr>
+                      
+                      {/* Total Assets Row */}
+                      <tr className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                        <td className="py-3 pr-4 text-sm font-medium text-gray-700 sticky left-0 bg-white">Total Assets</td>
+                        {companyData.balanceSheet.slice(0, 5).map((bs) => (
+                          <td key={bs.date} className="text-right py-3 px-3 text-sm text-gray-800">
+                            {formatCurrency(bs.totalAssets)}
+                          </td>
+                        ))}
+                      </tr>
+                      
+                      {/* Total Equity Row */}
+                      <tr className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                        <td className="py-3 pr-4 text-sm font-medium text-gray-700 sticky left-0 bg-white">Total Equity</td>
+                        {companyData.balanceSheet.slice(0, 5).map((bs) => (
+                          <td key={bs.date} className="text-right py-3 px-3 text-sm text-gray-800">
+                            {formatCurrency(bs.totalEquity)}
+                          </td>
+                        ))}
+                      </tr>
+                      
+                      {/* Book Value Per Share Row */}
+                      <tr className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                        <td className="py-3 pr-4 text-sm font-medium text-gray-700 sticky left-0 bg-white">Book Value/Share</td>
+                        {companyData.balanceSheet.slice(0, 5).map((bs) => (
+                          <td key={bs.date} className="text-right py-3 px-3 text-sm text-gray-800">
+                            {formatEPS(bs.bookValuePerShare)}
+                          </td>
+                        ))}
+                      </tr>
+                      
+                      {/* Shares Outstanding Row */}
+                      <tr className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                        <td className="py-3 pr-4 text-sm font-medium text-gray-700 sticky left-0 bg-white">Shares Outstanding</td>
+                        {companyData.incomeStatement.slice(0, 5).map((stmt) => (
+                          <td key={stmt.date} className="text-right py-3 px-3 text-sm text-gray-800">
+                            {formatShares(stmt.sharesOutstanding)}
+                          </td>
+                        ))}
+                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -324,6 +412,16 @@ export const Dashboard: React.FC = () => {
               <DCFCalculator 
                 symbol={companyData.symbol}
                 currentPrice={getCurrentPrice()}
+                defaultBaseFCF={companyData.cashFlowStatement[0]?.freeCashFlow}
+                defaultSharesOutstanding={companyData.incomeStatement[0]?.sharesOutstanding}
+                historicalFCF={companyData.cashFlowStatement.slice(0, 5).map(cf => ({
+                  year: formatYear(cf.date),
+                  value: cf.freeCashFlow
+                }))}
+                historicalShares={companyData.incomeStatement.slice(0, 5).map(stmt => ({
+                  year: formatYear(stmt.date),
+                  value: stmt.sharesOutstanding
+                }))}
               />
             </div>
           )}

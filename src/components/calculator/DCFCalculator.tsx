@@ -4,14 +4,27 @@ import { DCFResults } from './DCFResults';
 import { calculateDCFIntrinsicValue } from '../../utils/dcfCalculator';
 import type { DCFInputs, DCFResult } from '../../types';
 
+interface HistoricalValue {
+  year: string;
+  value: number;
+}
+
 interface DCFCalculatorProps {
   symbol?: string;
   currentPrice?: number;
+  defaultBaseFCF?: number;
+  defaultSharesOutstanding?: number;
+  historicalFCF?: HistoricalValue[];
+  historicalShares?: HistoricalValue[];
 }
 
 export const DCFCalculator: React.FC<DCFCalculatorProps> = ({ 
   symbol, 
-  currentPrice 
+  currentPrice,
+  defaultBaseFCF,
+  defaultSharesOutstanding,
+  historicalFCF,
+  historicalShares
 }) => {
   const [result, setResult] = useState<DCFResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -104,6 +117,21 @@ export const DCFCalculator: React.FC<DCFCalculatorProps> = ({
         <DCFInputForm 
           onSubmit={handleCalculate}
           loading={loading}
+          initialValues={
+            defaultBaseFCF && defaultSharesOutstanding
+              ? {
+                  baseFCF: defaultBaseFCF,
+                  sharesOutstanding: defaultSharesOutstanding,
+                  discountRate: 0.15,
+                  terminalGrowthRate: 0.03,
+                  projectionYears: 10,
+                  scenario: 'base',
+                  fcfGrowthRates: [] // Will be generated dynamically
+                }
+              : undefined
+          }
+          historicalFCF={historicalFCF}
+          historicalShares={historicalShares}
         />
       )}
 
