@@ -57,11 +57,12 @@ export function useFinancialData(companyData: CompanyFinancials | null) {
       0
     );
 
-    const latestDividend = getLatestValue(
-      companyData.cashFlowStatement,
-      cf => Math.abs(cf.dividendsPaid || 0),
-      0
-    );
+    // Calculate dividend per share for the latest period
+    const latestCashFlow = latestCashFlowStatement;
+    const latestIncome = latestIncomeStatement;
+    const latestDividendTotal = latestCashFlow ? Math.abs(latestCashFlow.dividendsPaid || 0) : 0;
+    const latestSharesForDividend = latestIncome ? latestIncome.sharesOutstanding : 1;
+    const latestDividend = latestSharesForDividend > 0 ? latestDividendTotal / latestSharesForDividend : 0;
 
     const latestNetIncome = getLatestValue(
       companyData.incomeStatement,

@@ -3,6 +3,7 @@ import { Header } from '../components/layout/Header';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { DCFCalculator } from '../components/calculator/DCFCalculator';
+import { DDMCalculator } from '../components/calculator/DDMCalculator';
 import { CalculatorTabs, type CalculatorModel } from '../components/calculator/CalculatorTabs';
 import { CalculatorSummary } from '../components/calculator/CalculatorSummary';
 import { FinancialHistoryTable } from '../components/dashboard/FinancialHistoryTable';
@@ -301,10 +302,24 @@ export const Dashboard: React.FC = () => {
                 )}
 
                 {activeTab === 'DDM' && (
-                  <div className="py-12 text-center">
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Dividend Discount Model</h3>
-                    <p className="text-sm text-gray-600">Coming soon...</p>
-                  </div>
+                  <DDMCalculator
+                    symbol={companyData.symbol}
+                    currentPrice={getCurrentPrice()}
+                    defaultDividend={financialData.latestDividend}
+                    defaultSharesOutstanding={financialData.latestShares}
+                    historicalDividends={companyData.cashFlowStatement
+                      .slice(0, 5)
+                      .map(cf => ({
+                        year: formatYear(cf.date),
+                        value: Math.abs(cf.dividendsPaid || 0) / (companyData.incomeStatement.find(
+                          is => is.date === cf.date
+                        )?.sharesOutstanding || 1)
+                      }))
+                      .filter(d => d.value > 0)
+                      .sort((a, b) => parseInt(b.year) - parseInt(a.year))}
+                    historicalShares={financialData.historicalShares}
+                    onCalculationComplete={(result) => handleCalculatorComplete('DDM', result)}
+                  />
                 )}
 
                 {activeTab === 'NAV' && (

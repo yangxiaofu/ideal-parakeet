@@ -49,7 +49,7 @@ export const CalculatorTabs: React.FC<CalculatorTabsProps> = ({
       name: 'DDM',
       description: 'Dividend Discount',
       icon: <DollarSign className="h-4 w-4" />,
-      available: false, // Coming soon
+      available: true, // Now available!
       completed: completedCalculators.has('DDM'),
       result: results.DDM
     },
