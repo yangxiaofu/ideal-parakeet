@@ -1,0 +1,135 @@
+/**
+ * Utility functions for processing and sorting financial data
+ */
+
+import { formatYear } from './formatters';
+
+export interface HistoricalValue {
+  year: string;
+  value: number;
+}
+
+/**
+ * Get the latest (most recent) entry from a financial statement array
+ * @param entries Array of financial statement entries with date field
+ * @returns The entry with the most recent date, or null if array is empty
+ */
+export function getLatestFinancialEntry<T extends { date: string }>(
+  entries: T[]
+): T | null {
+  if (!entries || entries.length === 0) return null;
+  
+  // Sort by date descending and return the first (most recent)
+  return [...entries].sort((a, b) => {
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+    return dateB - dateA; // Descending order (newest first)
+  })[0];
+}
+
+/**
+ * Sort financial entries by date in descending order (newest first)
+ * @param entries Array of financial statement entries with date field
+ * @returns Sorted array with newest entries first
+ */
+export function sortFinancialDataByDate<T extends { date: string }>(
+  entries: T[]
+): T[] {
+  if (!entries || entries.length === 0) return [];
+  
+  return [...entries].sort((a, b) => {
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+    return dateB - dateA; // Descending order (newest first)
+  });
+}
+
+/**
+ * Prepare historical data for SelectableInput component
+ * Ensures data is sorted newest first for correct "Latest" labeling
+ * @param statements Array of financial statements
+ * @param valueExtractor Function to extract the value from each statement
+ * @returns Array of historical values sorted newest first
+ */
+export function prepareHistoricalData<T extends { date: string }>(
+  statements: T[],
+  valueExtractor: (stmt: T) => number
+): HistoricalValue[] {
+  if (!statements || statements.length === 0) return [];
+  
+  // Sort statements newest first
+  const sorted = sortFinancialDataByDate(statements);
+  
+  // Extract and format the data
+  return sorted.map(stmt => ({
+    year: formatYear(stmt.date),
+    value: valueExtractor(stmt)
+  }));
+}
+
+/**
+ * Get the index of the latest year in a financial statement array
+ * @param entries Array of financial statement entries with date field
+ * @returns Index of the latest entry, or 0 if not found
+ */
+export function getLatestIndex<T extends { date: string }>(
+  entries: T[]
+): number {
+  if (!entries || entries.length === 0) return 0;
+  
+  let latestIndex = 0;
+  let latestDate = new Date(entries[0].date).getTime();
+  
+  for (let i = 1; i < entries.length; i++) {
+    const currentDate = new Date(entries[i].date).getTime();
+    if (currentDate > latestDate) {
+      latestDate = currentDate;
+      latestIndex = i;
+    }
+  }
+  
+  return latestIndex;
+}
+
+/**
+ * Extract a specific value from the latest financial statement
+ * @param statements Array of financial statements
+ * @param valueExtractor Function to extract the desired value
+ * @param defaultValue Default value if no statements or extraction fails
+ * @returns The extracted value from the latest statement
+ */
+export function getLatestValue<T extends { date: string }>(
+  statements: T[],
+  valueExtractor: (stmt: T) => number,
+  defaultValue: number = 0
+): number {
+  const latest = getLatestFinancialEntry(statements);
+  return latest ? valueExtractor(latest) : defaultValue;
+}
+
+/**
+ * Calculate growth rate between two values
+ * @param currentValue The current/newer value
+ * @param previousValue The previous/older value
+ * @returns Growth rate as a percentage
+ */
+export function calculateGrowthRate(
+  currentValue: number,
+  previousValue: number
+): number {
+  if (previousValue === 0) return 0;
+  return ((currentValue - previousValue) / Math.abs(previousValue)) * 100;
+}
+
+/**
+ * Check if a company pays dividends based on cash flow statements
+ * @param cashFlowStatements Array of cash flow statements
+ * @returns True if the company has paid dividends
+ */
+export function hasDividends(cashFlowStatements: any[]): boolean {
+  if (!cashFlowStatements || cashFlowStatements.length === 0) return false;
+  
+  return cashFlowStatements.some(
+    cf => cf.dividendsPaid && cf.dividendsPaid !== 0
+  );
+}
