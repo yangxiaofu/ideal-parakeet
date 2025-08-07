@@ -20,7 +20,7 @@ interface DCFInputFormProps {
 }
 
 // Dynamic growth pattern generation with distribution controls
-type DistributionType = 'front-loaded' | 'balanced' | 'back-loaded';
+type DistributionType = 'front-loaded' | 'balanced';
 type FrontLoadIntensity = 'light' | 'medium' | 'heavy' | 'extreme';
 
 const generateDecayPattern = (
@@ -46,8 +46,6 @@ const generateDecayPattern = (
       }[frontLoadIntensity];
       
       progress = Math.pow(progress, intensity);
-    } else if (distribution === 'back-loaded') {
-      progress = Math.pow(progress, 0.5); // Square root for back-loading
     }
     // 'balanced' uses linear progress
     
@@ -388,7 +386,7 @@ export const DCFInputForm: React.FC<DCFInputFormProps> = ({
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-gray-600">Distribution Pattern</label>
                   <div className="grid grid-cols-3 gap-2">
-                    {(['front-loaded', 'balanced', 'back-loaded'] as DistributionType[]).map(dist => (
+                    {(['front-loaded', 'balanced'] as DistributionType[]).map(dist => (
                       <button
                         key={dist}
                         type="button"
