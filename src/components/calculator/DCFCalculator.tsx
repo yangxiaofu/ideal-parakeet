@@ -16,6 +16,7 @@ interface DCFCalculatorProps {
   defaultSharesOutstanding?: number;
   historicalFCF?: HistoricalValue[];
   historicalShares?: HistoricalValue[];
+  onCalculationComplete?: (intrinsicValue: number) => void;
 }
 
 export const DCFCalculator: React.FC<DCFCalculatorProps> = ({ 
@@ -24,7 +25,8 @@ export const DCFCalculator: React.FC<DCFCalculatorProps> = ({
   defaultBaseFCF,
   defaultSharesOutstanding,
   historicalFCF,
-  historicalShares
+  historicalShares,
+  onCalculationComplete
 }) => {
   const [result, setResult] = useState<DCFResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -47,6 +49,11 @@ export const DCFCalculator: React.FC<DCFCalculatorProps> = ({
         });
       } else {
         setResult(dcfResult);
+      }
+      
+      // Report the result to parent
+      if (onCalculationComplete) {
+        onCalculationComplete(dcfResult.intrinsicValuePerShare);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred during calculation';

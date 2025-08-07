@@ -3,8 +3,11 @@ import { Header } from '../components/layout/Header';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { DCFCalculator } from '../components/calculator/DCFCalculator';
+import { CalculatorTabs, type CalculatorModel } from '../components/calculator/CalculatorTabs';
+import { CalculatorSummary } from '../components/calculator/CalculatorSummary';
 import { fmpApi } from '../services/fmpApi';
 import { formatCurrency, formatShares, formatEPS, formatYear } from '../utils/formatters';
+import { getRecommendedCalculators } from '../constants/calculatorInfo';
 import type { CompanyFinancials } from '../types';
 
 export const Dashboard: React.FC = () => {
@@ -12,7 +15,9 @@ export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [companyData, setCompanyData] = useState<CompanyFinancials | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<CalculatorModel>('DCF');
+  const [completedCalculators, setCompletedCalculators] = useState<Set<CalculatorModel>>(new Set());
+  const [calculatorResults, setCalculatorResults] = useState<Partial<Record<CalculatorModel, number>>>({});
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,7 +26,9 @@ export const Dashboard: React.FC = () => {
     setLoading(true);
     setError(null);
     setCompanyData(null);
-    setSelectedModel(null);
+    setActiveTab('DCF');
+    setCompletedCalculators(new Set());
+    setCalculatorResults({});
     
     try {
       console.log('Fetching data for:', ticker);
@@ -35,8 +42,13 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  const handleModelSelect = (model: string) => {
-    setSelectedModel(model);
+  const handleTabChange = (tab: CalculatorModel) => {
+    setActiveTab(tab);
+  };
+
+  const handleCalculatorComplete = (model: CalculatorModel, result: number) => {
+    setCompletedCalculators(prev => new Set([...prev, model]));
+    setCalculatorResults(prev => ({ ...prev, [model]: result }));
   };
 
   const getCurrentPrice = (): number | undefined => {
@@ -353,76 +365,105 @@ export const Dashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Valuation Models - Minimal */}
-          {companyData && !selectedModel && (
-            <div className="minimal-card">
-              <div className="text-center mb-8">
-                <h3 className="text-xl font-medium text-gray-800 mb-2">Choose Valuation Model</h3>
-                <p className="text-sm text-gray-500">
-                  Select a model to value {companyData.symbol}
-                </p>
-              </div>
+          {/* Calculator Section with Tabs */}
+          {companyData && (
+            <div className="space-y-6">
+              {/* Recommendation Banner */}
+              {(() => {
+                const recommendations = getRecommendedCalculators(companyData);
+                return recommendations.recommended.length > 0 ? (
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span className="text-green-600">✓</span>
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-sm font-medium text-green-900 mb-1">
+                          Recommended Calculators for {companyData.name}
+                        </h3>
+                        <p className="text-sm text-green-700">
+                          Based on the financial characteristics, we recommend using{' '}
+                          <strong>{recommendations.recommended.join(', ')}</strong> for valuation.
+                        </p>
+                        {recommendations.caution.length > 0 && (
+                          <p className="text-sm text-yellow-700 mt-1">
+                            Use with caution: {recommendations.caution.join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : null;
+              })()}
               
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <button
-                  onClick={() => handleModelSelect('DCF')}
-                  className="bg-gray-900 text-white rounded-2xl p-6 hover:bg-gray-800 transition-all duration-200 text-left"
-                >
-                  <div className="mb-3">
-                    <span className="text-lg font-semibold">DCF</span>
-                  </div>
-                  <p className="text-xs text-gray-300">
-                    Discounted Cash Flow
-                  </p>
-                </button>
-
-                <div className="bg-gray-50 rounded-2xl p-6 opacity-50">
-                  <div className="mb-3">
-                    <span className="text-lg font-semibold text-gray-400">DDM</span>
-                  </div>
-                  <p className="text-xs text-gray-400">
-                    Coming Soon
-                  </p>
-                </div>
-
-                <div className="bg-gray-50 rounded-2xl p-6 opacity-50">
-                  <div className="mb-3">
-                    <span className="text-lg font-semibold text-gray-400">NAV</span>
-                  </div>
-                  <p className="text-xs text-gray-400">
-                    Coming Soon
-                  </p>
-                </div>
-
-                <div className="bg-gray-50 rounded-2xl p-6 opacity-50">
-                  <div className="mb-3">
-                    <span className="text-lg font-semibold text-gray-400">EPV</span>
-                  </div>
-                  <p className="text-xs text-gray-400">
-                    Coming Soon
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* DCF Calculator */}
-          {companyData && selectedModel === 'DCF' && (
-            <div className="max-w-6xl mx-auto">
-              <DCFCalculator 
-                symbol={companyData.symbol}
-                currentPrice={getCurrentPrice()}
-                defaultBaseFCF={companyData.cashFlowStatement[0]?.freeCashFlow}
-                defaultSharesOutstanding={companyData.incomeStatement[0]?.sharesOutstanding}
-                historicalFCF={companyData.cashFlowStatement.slice(0, 5).map(cf => ({
-                  year: formatYear(cf.date),
-                  value: cf.freeCashFlow
-                }))}
-                historicalShares={companyData.incomeStatement.slice(0, 5).map(stmt => ({
-                  year: formatYear(stmt.date),
-                  value: stmt.sharesOutstanding
-                }))}
+              {/* Calculator Tabs */}
+              <CalculatorTabs
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
+                completedCalculators={completedCalculators}
+                results={calculatorResults}
+                companyData={companyData}
               />
+
+              {/* Calculator Content */}
+              <div className="minimal-card">
+                {activeTab === 'DCF' && (
+                  <DCFCalculator 
+                    symbol={companyData.symbol}
+                    currentPrice={getCurrentPrice()}
+                    defaultBaseFCF={companyData.cashFlowStatement[0]?.freeCashFlow}
+                    defaultSharesOutstanding={companyData.incomeStatement[0]?.sharesOutstanding}
+                    historicalFCF={companyData.cashFlowStatement
+                      .slice(0, 5)
+                      .map(cf => ({
+                        year: formatYear(cf.date),
+                        value: cf.freeCashFlow
+                      }))} // Keep API order - should be newest first
+                    historicalShares={companyData.incomeStatement
+                      .slice(0, 5)
+                      .map(stmt => ({
+                        year: formatYear(stmt.date),
+                        value: stmt.sharesOutstanding
+                      }))} // Keep API order - should be newest first
+                    onCalculationComplete={(result) => handleCalculatorComplete('DCF', result)}
+                  />
+                )}
+
+                {activeTab === 'DDM' && (
+                  <div className="py-12 text-center">
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Dividend Discount Model</h3>
+                    <p className="text-sm text-gray-600">Coming soon...</p>
+                  </div>
+                )}
+
+                {activeTab === 'NAV' && (
+                  <div className="py-12 text-center">
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Net Asset Value</h3>
+                    <p className="text-sm text-gray-600">Coming soon...</p>
+                  </div>
+                )}
+
+                {activeTab === 'EPV' && (
+                  <div className="py-12 text-center">
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Earnings Power Value</h3>
+                    <p className="text-sm text-gray-600">Coming soon...</p>
+                  </div>
+                )}
+
+                {activeTab === 'SUMMARY' && (
+                  <CalculatorSummary
+                    symbol={companyData.symbol}
+                    companyName={companyData.name}
+                    currentPrice={getCurrentPrice()}
+                    results={Object.entries(calculatorResults).map(([model, value]) => ({
+                      model: model as CalculatorModel,
+                      intrinsicValue: value,
+                      currentPrice: getCurrentPrice(),
+                      confidence: 'medium' // This should come from the calculator
+                    }))}
+                  />
+                )}
+              </div>
             </div>
           )}
         </div>
