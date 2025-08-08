@@ -67,7 +67,7 @@ export const CalculatorTabs: React.FC<CalculatorTabsProps> = ({
       name: 'NAV',
       description: 'Net Asset Value',
       icon: <BarChart3 className="h-4 w-4" />,
-      available: false, // Coming soon
+      available: true, // Now available!
       completed: completedCalculators.has('NAV'),
       result: results.NAV
     },
@@ -186,12 +186,12 @@ export const CalculatorTabs: React.FC<CalculatorTabsProps> = ({
         <div className="px-4 pb-2">
           <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
             <span>Analysis Progress</span>
-<span>{completedCalculators.size} of 5 models completed</span>
+            <span>{completedCalculators.size} of {tabs.filter(tab => tab.available && tab.id !== 'SUMMARY').length} models completed</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-1.5">
             <div 
               className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
-              style={{ width: `${(completedCalculators.size / 5) * 100}%` }}
+              style={{ width: `${(completedCalculators.size / tabs.filter(tab => tab.available && tab.id !== 'SUMMARY').length) * 100}%` }}
             />
           </div>
         </div>

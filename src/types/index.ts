@@ -24,6 +24,41 @@ export interface BalanceSheet {
   totalLiabilities: number;
   totalEquity: number;
   bookValuePerShare: number;
+  
+  // Enhanced asset breakdown for NAV analysis (optional fields)
+  currentAssets?: number;
+  cash?: number;
+  cashAndEquivalents?: number;
+  marketableSecurities?: number;
+  accountsReceivable?: number;
+  inventory?: number;
+  prepaidExpenses?: number;
+  otherCurrentAssets?: number;
+  
+  // Non-current assets
+  propertyPlantEquipment?: number;
+  intangibleAssets?: number;
+  goodwill?: number;
+  investments?: number;
+  otherNonCurrentAssets?: number;
+  
+  // Enhanced liability breakdown for NAV analysis (optional fields)
+  currentLiabilities?: number;
+  accountsPayable?: number;
+  accruedExpenses?: number;
+  shortTermDebt?: number;
+  otherCurrentLiabilities?: number;
+  
+  // Non-current liabilities
+  longTermDebt?: number;
+  pensionObligations?: number;
+  deferredTaxLiabilities?: number;
+  otherNonCurrentLiabilities?: number;
+  
+  // Additional fields for comprehensive analysis
+  tangibleBookValue?: number;
+  workingCapital?: number;
+  netTangibleAssets?: number;
 }
 
 export interface CashFlowStatement {

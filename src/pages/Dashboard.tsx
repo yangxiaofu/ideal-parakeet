@@ -5,6 +5,7 @@ import { Input } from '../components/ui/input';
 import { DCFCalculator } from '../components/calculator/DCFCalculator';
 import { DDMCalculator } from '../components/calculator/DDMCalculator';
 import { RelativeValuationCalculator } from '../components/calculator/RelativeValuationCalculator';
+import { NAVCalculator } from '../components/calculator/NAVCalculator';
 import { CalculatorTabs, type CalculatorModel } from '../components/calculator/CalculatorTabs';
 import { CalculatorSummary } from '../components/calculator/CalculatorSummary';
 import { FinancialHistoryTable } from '../components/dashboard/FinancialHistoryTable';
@@ -285,7 +286,11 @@ export const Dashboard: React.FC = () => {
                 onTabChange={handleTabChange}
                 completedCalculators={completedCalculators}
                 results={calculatorResults}
-                companyData={companyData}
+                companyData={{
+                  balanceSheet: companyData.balanceSheet,
+                  incomeStatement: companyData.incomeStatement,
+                  cashFlowStatement: companyData.cashFlowStatement
+                }}
               />
 
               {/* Calculator Content */}
@@ -345,10 +350,19 @@ export const Dashboard: React.FC = () => {
                 )}
 
                 {activeTab === 'NAV' && (
-                  <div className="py-12 text-center">
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Net Asset Value</h3>
-                    <p className="text-sm text-gray-600">Coming soon...</p>
-                  </div>
+                  <NAVCalculator
+                    symbol={companyData.symbol}
+                    currentPrice={getCurrentPrice()}
+                    balanceSheet={financialData.latestBalanceSheet || undefined}
+                    historicalBookValues={companyData.balanceSheet
+                      .slice(0, 5)
+                      .map(bs => ({
+                        year: bs.date.split('-')[0],
+                        value: bs.bookValuePerShare
+                      }))
+                      .sort((a, b) => parseInt(b.year) - parseInt(a.year))}
+                    onCalculationComplete={(result) => handleCalculatorComplete('NAV', result)}
+                  />
                 )}
 
                 {activeTab === 'EPV' && (

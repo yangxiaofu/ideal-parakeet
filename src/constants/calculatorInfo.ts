@@ -154,7 +154,11 @@ export const CALCULATOR_INFO: Record<string, CalculatorInfo> = {
 };
 
 // Helper function to get recommended calculators based on company characteristics
-export function getRecommendedCalculators(companyData: Record<string, unknown>): {
+export function getRecommendedCalculators(companyData: {
+  balanceSheet?: Array<{ totalAssets: number; totalEquity: number; totalLiabilities: number; date: string }>;
+  incomeStatement?: Array<{ revenue: number; netIncome: number; date: string }>;
+  cashFlowStatement?: Array<{ dividendsPaid: number; freeCashFlow: number; date: string }>;
+}): {
   recommended: string[];
   caution: string[];
   notRecommended: string[];
@@ -168,10 +172,10 @@ export function getRecommendedCalculators(companyData: Record<string, unknown>):
   };
 
   // Check if company has consistent cash flows (for DCF)
-  if (companyData.cashFlowStatement && companyData.cashFlowStatement.length >= 3) {
-    const cashFlows = companyData.cashFlowStatement.slice(0, 3).map((cf: Record<string, unknown>) => cf.freeCashFlow as number);
-    const avgCashFlow = cashFlows.reduce((a: number, b: number) => a + b, 0) / cashFlows.length;
-    const allPositive = cashFlows.every((cf: number) => cf > 0);
+  if (companyData.cashFlowStatement && Array.isArray(companyData.cashFlowStatement) && companyData.cashFlowStatement.length >= 3) {
+    const cashFlows = companyData.cashFlowStatement.slice(0, 3).map(cf => cf.freeCashFlow);
+    const avgCashFlow = cashFlows.reduce((a, b) => a + b, 0) / cashFlows.length;
+    const allPositive = cashFlows.every(cf => cf > 0);
     
     if (allPositive && avgCashFlow > 0) {
       recommendations.recommended.push('DCF');
@@ -186,11 +190,11 @@ export function getRecommendedCalculators(companyData: Record<string, unknown>):
   }
 
   // Check for dividend payments (for DDM)
-  if (companyData.cashFlowStatement && companyData.cashFlowStatement[0]) {
+  if (companyData.cashFlowStatement && Array.isArray(companyData.cashFlowStatement) && companyData.cashFlowStatement.length > 0) {
     const latestDividend = companyData.cashFlowStatement[0].dividendsPaid;
     const hasConsistentDividends = companyData.cashFlowStatement
       .slice(0, Math.min(3, companyData.cashFlowStatement.length))
-      .every((cf: Record<string, unknown>) => cf.dividendsPaid && (cf.dividendsPaid as number) < 0); // Dividends are negative in cash flow
+      .every(cf => cf.dividendsPaid && cf.dividendsPaid < 0); // Dividends are negative in cash flow
     
     if (hasConsistentDividends) {
       recommendations.recommended.push('DDM');
@@ -204,32 +208,96 @@ export function getRecommendedCalculators(companyData: Record<string, unknown>):
     }
   }
 
-  // Check asset intensity (for NAV)
-  if (companyData.balanceSheet && companyData.balanceSheet[0]) {
-    const totalAssets = companyData.balanceSheet[0].totalAssets;
-    const totalEquity = companyData.balanceSheet[0].totalEquity;
-    const assetToEquityRatio = totalAssets / totalEquity;
+  // Check asset intensity (for NAV) - Enhanced logic for better asset-heavy detection
+  if (companyData.balanceSheet && Array.isArray(companyData.balanceSheet) && companyData.balanceSheet.length > 0 && 
+      companyData.incomeStatement && Array.isArray(companyData.incomeStatement) && companyData.incomeStatement.length > 0) {
+    const latestBalance = companyData.balanceSheet[0];
+    const latestIncome = companyData.incomeStatement[0];
     
-    if (assetToEquityRatio > 2) {
+    const totalAssets = latestBalance.totalAssets;
+    const totalEquity = latestBalance.totalEquity;
+    const revenue = latestIncome.revenue;
+    
+    // Calculate multiple ratios to better identify asset-heavy businesses
+    const assetToEquityRatio = totalAssets / totalEquity;
+    const assetToRevenueRatio = totalAssets / revenue;
+    const assetTurnoverRatio = revenue / totalAssets;
+    
+    // Enhanced scoring for asset-heavy business identification
+    let navScore = 0;
+    let reason = '';
+    
+    // High asset-to-equity ratio suggests leveraged asset base
+    if (assetToEquityRatio > 3) {
+      navScore += 2;
+      reason += 'High leverage with substantial asset base';
+    } else if (assetToEquityRatio > 2) {
+      navScore += 1;
+    }
+    
+    // High asset-to-revenue ratio suggests asset-intensive business
+    if (assetToRevenueRatio > 2) {
+      navScore += 2;
+      if (reason) reason += '; ';
+      reason += 'Asset-intensive operations';
+    } else if (assetToRevenueRatio > 1) {
+      navScore += 1;
+    }
+    
+    // Low asset turnover suggests asset-heavy model
+    if (assetTurnoverRatio < 0.5) {
+      navScore += 2;
+      if (reason) reason += '; ';
+      reason += 'Low asset turnover indicates capital-intensive business';
+    } else if (assetTurnoverRatio < 1) {
+      navScore += 1;
+    }
+    
+    // Additional check for manufacturing/real estate indicators
+    // Look for consistent asset growth (typical of asset-heavy industries)
+    if (companyData.balanceSheet.length >= 3) {
+      const assetGrowthRates: number[] = [];
+      for (let i = 0; i < Math.min(3, companyData.balanceSheet.length - 1); i++) {
+        const current = companyData.balanceSheet[i].totalAssets;
+        const previous = companyData.balanceSheet[i + 1].totalAssets;
+        if (previous > 0) {
+          assetGrowthRates.push((current - previous) / previous);
+        }
+      }
+      
+      const avgAssetGrowth = assetGrowthRates.length > 0 
+        ? assetGrowthRates.reduce((a, b) => a + b) / assetGrowthRates.length 
+        : 0;
+        
+      // Consistent asset growth suggests ongoing capital investment
+      if (avgAssetGrowth > 0.05 && assetGrowthRates.every(rate => rate > -0.1)) {
+        navScore += 1;
+        if (reason) reason += '; ';
+        reason += 'Consistent asset base growth';
+      }
+    }
+    
+    // Final recommendation based on comprehensive scoring
+    if (navScore >= 4) {
       recommendations.recommended.push('NAV');
-      recommendations.reasons['NAV'] = 'Asset-heavy business structure';
-    } else if (assetToEquityRatio > 1.5) {
+      recommendations.reasons['NAV'] = `Strong asset-heavy characteristics: ${reason}`;
+    } else if (navScore >= 2) {
       recommendations.caution.push('NAV');
-      recommendations.reasons['NAV'] = 'Moderate asset base';
+      recommendations.reasons['NAV'] = `Moderate asset intensity: ${reason || 'Some asset-heavy indicators present'}`;
     } else {
       recommendations.caution.push('NAV');
-      recommendations.reasons['NAV'] = 'Lower asset intensity - may be less relevant';
+      recommendations.reasons['NAV'] = 'Asset-light business model - NAV may provide conservative floor value only';
     }
   }
 
   // Check earnings stability (for EPV)
-  if (companyData.incomeStatement && companyData.incomeStatement.length >= 3) {
-    const earnings = companyData.incomeStatement.slice(0, 3).map((is: Record<string, unknown>) => is.netIncome as number);
-    const allPositive = earnings.every((e: number) => e > 0);
-    const avgEarnings = earnings.reduce((a: number, b: number) => a + b, 0) / earnings.length;
+  if (companyData.incomeStatement && Array.isArray(companyData.incomeStatement) && companyData.incomeStatement.length >= 3) {
+    const earnings = companyData.incomeStatement.slice(0, 3).map(is => is.netIncome);
+    const allPositive = earnings.every(e => e > 0);
+    const avgEarnings = earnings.reduce((a, b) => a + b, 0) / earnings.length;
     
     // Calculate earnings volatility
-    const variance = earnings.reduce((sum: number, e: number) => 
+    const variance = earnings.reduce((sum, e) => 
       sum + Math.pow(e - avgEarnings, 2), 0) / earnings.length;
     const coefficientOfVariation = Math.sqrt(variance) / Math.abs(avgEarnings);
     

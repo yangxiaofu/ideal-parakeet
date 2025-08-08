@@ -29,6 +29,42 @@ interface FMPBalanceSheet {
   totalLiabilities: number;
   totalStockholdersEquity: number;
   commonStock: number;
+  
+  // Enhanced asset fields from FMP API for NAV analysis
+  totalCurrentAssets?: number;
+  cashAndCashEquivalents?: number;
+  shortTermInvestments?: number;
+  cashAndShortTermInvestments?: number;
+  netReceivables?: number;
+  inventory?: number;
+  otherCurrentAssets?: number;
+  
+  totalNonCurrentAssets?: number;
+  propertyPlantEquipmentNet?: number;
+  goodwill?: number;
+  intangibleAssets?: number;
+  goodwillAndIntangibleAssets?: number;
+  longTermInvestments?: number;
+  otherNonCurrentAssets?: number;
+  
+  // Enhanced liability fields from FMP API
+  totalCurrentLiabilities?: number;
+  accountPayables?: number;
+  shortTermDebt?: number;
+  taxPayables?: number;
+  deferredRevenue?: number;
+  otherCurrentLiabilities?: number;
+  
+  totalNonCurrentLiabilities?: number;
+  longTermDebt?: number;
+  deferredRevenueNonCurrent?: number;
+  deferredTaxLiabilitiesNonCurrent?: number;
+  otherNonCurrentLiabilities?: number;
+  
+  // Additional computed fields
+  totalDebt?: number;
+  netDebt?: number;
+  retainedEarnings?: number;
 }
 
 interface FMPCashFlow {
@@ -147,13 +183,65 @@ class FMPApiService {
     const url = `${API_URL}/balance-sheet-statement/${symbol}?limit=${years}&apikey=${API_KEY}`;
     const data = await this.fetchWithErrorHandling(url) as FMPBalanceSheet[];
     
-    return data.map((item) => ({
-      date: item.date,
-      totalAssets: item.totalAssets || 0,
-      totalLiabilities: item.totalLiabilities || 0,
-      totalEquity: item.totalStockholdersEquity || 0,
-      bookValuePerShare: item.totalStockholdersEquity / (item.commonStock || 1)
-    }));
+    return data.map((item) => {
+      // Calculate derived values
+      const totalEquity = item.totalStockholdersEquity || 0;
+      const totalAssets = item.totalAssets || 0;
+      const totalLiabilities = item.totalLiabilities || 0;
+      const sharesOutstanding = item.commonStock || 1;
+      
+      // Enhanced asset calculations
+      const cash = item.cashAndCashEquivalents || 0;
+      const cashAndEquivalents = item.cashAndShortTermInvestments || cash;
+      const goodwill = item.goodwill || 0;
+      const intangibleAssets = item.intangibleAssets || 0;
+      const tangibleBookValue = totalEquity - goodwill - intangibleAssets;
+      const workingCapital = (item.totalCurrentAssets || 0) - (item.totalCurrentLiabilities || 0);
+      const netTangibleAssets = totalAssets - goodwill - intangibleAssets - totalLiabilities;
+      
+      return {
+        date: item.date,
+        totalAssets,
+        totalLiabilities,
+        totalEquity,
+        bookValuePerShare: totalEquity / sharesOutstanding,
+        
+        // Enhanced asset breakdown for NAV analysis
+        currentAssets: item.totalCurrentAssets,
+        cash: item.cashAndCashEquivalents,
+        cashAndEquivalents,
+        marketableSecurities: item.shortTermInvestments,
+        accountsReceivable: item.netReceivables,
+        inventory: item.inventory,
+        prepaidExpenses: undefined, // Not available in FMP standard fields
+        otherCurrentAssets: item.otherCurrentAssets,
+        
+        // Non-current assets
+        propertyPlantEquipment: item.propertyPlantEquipmentNet,
+        intangibleAssets,
+        goodwill,
+        investments: item.longTermInvestments,
+        otherNonCurrentAssets: item.otherNonCurrentAssets,
+        
+        // Enhanced liability breakdown for NAV analysis
+        currentLiabilities: item.totalCurrentLiabilities,
+        accountsPayable: item.accountPayables,
+        accruedExpenses: undefined, // Not directly available in FMP
+        shortTermDebt: item.shortTermDebt,
+        otherCurrentLiabilities: item.otherCurrentLiabilities,
+        
+        // Non-current liabilities
+        longTermDebt: item.longTermDebt,
+        pensionObligations: undefined, // Would need to be parsed from other fields
+        deferredTaxLiabilities: item.deferredTaxLiabilitiesNonCurrent,
+        otherNonCurrentLiabilities: item.otherNonCurrentLiabilities,
+        
+        // Additional computed fields for comprehensive analysis
+        tangibleBookValue,
+        workingCapital,
+        netTangibleAssets
+      };
+    });
   }
 
   async getCashFlowStatement(symbol: string, years: number = 10): Promise<CashFlowStatement[]> {

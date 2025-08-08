@@ -25,7 +25,11 @@ export const RecommendationBanner: React.FC<RecommendationBannerProps> = ({
   latestBalanceSheet,
   latestCashFlowStatement
 }) => {
-  const recommendations = getRecommendedCalculators(companyData);
+  const recommendations = getRecommendedCalculators({
+    balanceSheet: companyData.balanceSheet,
+    incomeStatement: companyData.incomeStatement,
+    cashFlowStatement: companyData.cashFlowStatement
+  });
   
   if (recommendations.recommended.length === 0) {
     return null;
