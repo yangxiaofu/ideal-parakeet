@@ -5,16 +5,10 @@ import { calculateNAV } from '../../utils/navCalculator';
 import type { NAVInputs, NAVResult } from '../../types/nav';
 import type { BalanceSheet } from '../../types';
 
-interface HistoricalValue {
-  year: string;
-  value: number;
-}
-
 interface NAVCalculatorProps {
   symbol?: string;
   currentPrice?: number;
   balanceSheet?: BalanceSheet;
-  historicalBookValues?: HistoricalValue[];
   onCalculationComplete?: (navPerShare: number) => void;
 }
 
@@ -22,7 +16,6 @@ export const NAVCalculator: React.FC<NAVCalculatorProps> = ({
   symbol, 
   currentPrice,
   balanceSheet,
-  historicalBookValues,
   onCalculationComplete
 }) => {
   const [result, setResult] = useState<NAVResult | null>(null);
@@ -153,7 +146,6 @@ export const NAVCalculator: React.FC<NAVCalculatorProps> = ({
           onSubmit={handleCalculate}
           loading={loading}
           balanceSheet={balanceSheet}
-          historicalBookValues={historicalBookValues}
         />
       )}
 

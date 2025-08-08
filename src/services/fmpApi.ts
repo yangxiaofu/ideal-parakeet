@@ -239,7 +239,8 @@ class FMPApiService {
         // Additional computed fields for comprehensive analysis
         tangibleBookValue,
         workingCapital,
-        netTangibleAssets
+        netTangibleAssets,
+        sharesOutstanding
       };
     });
   }

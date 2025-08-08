@@ -59,6 +59,7 @@ export interface BalanceSheet {
   tangibleBookValue?: number;
   workingCapital?: number;
   netTangibleAssets?: number;
+  sharesOutstanding?: number;
 }
 
 export interface CashFlowStatement {
