@@ -122,11 +122,54 @@ export function calculateGrowthRate(
 }
 
 /**
+ * Calculate revenue growth rate from income statements
+ * Properly handles data ordering and edge cases
+ * @param incomeStatements Array of income statements
+ * @returns Growth rate as decimal (0.15 = 15%), defaults to 10% if invalid data
+ */
+export function calculateRevenueGrowthRate(incomeStatements: Record<string, unknown>[]): number {
+  if (!incomeStatements || incomeStatements.length < 2) {
+    return 0.10; // Default 10% growth
+  }
+  
+  // Sort statements by date (newest first) to ensure correct ordering
+  const sortedStatements = sortFinancialDataByDate(incomeStatements);
+  
+  if (sortedStatements.length < 2) {
+    return 0.10; // Default if sorting fails
+  }
+  
+  const currentRevenue = sortedStatements[0]?.revenue || 0;
+  const previousRevenue = sortedStatements[1]?.revenue || 0;
+  
+  // Validate data quality
+  if (previousRevenue <= 0 || currentRevenue <= 0) {
+    return 0.10; // Default for invalid revenue data
+  }
+  
+  // Ensure dates are actually in correct order
+  const currentDate = new Date(sortedStatements[0]?.date);
+  const previousDate = new Date(sortedStatements[1]?.date);
+  if (currentDate <= previousDate) {
+    return 0.10; // Default if dates are wrong
+  }
+  
+  // Calculate growth rate
+  const growthRate = (currentRevenue - previousRevenue) / previousRevenue;
+  
+  // Round to 4 decimal places to avoid floating point precision issues
+  const roundedRate = Math.round(growthRate * 10000) / 10000;
+  
+  // Cap growth rate between -50% and 100% for realistic bounds
+  return Math.max(-0.5, Math.min(1.0, roundedRate));
+}
+
+/**
  * Check if a company pays dividends based on cash flow statements
  * @param cashFlowStatements Array of cash flow statements
  * @returns True if the company has paid dividends
  */
-export function hasDividends(cashFlowStatements: any[]): boolean {
+export function hasDividends(cashFlowStatements: Record<string, unknown>[]): boolean {
   if (!cashFlowStatements || cashFlowStatements.length === 0) return false;
   
   return cashFlowStatements.some(

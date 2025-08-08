@@ -7,7 +7,6 @@ import type {
   DDMResult,
   DDMValidation,
   DividendProjection,
-  GrowthPhase,
   DDMSensitivity
 } from '../types/ddm';
 

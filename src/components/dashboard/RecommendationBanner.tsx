@@ -10,9 +10,9 @@ interface RecommendationBannerProps {
   latestNetIncome: number;
   latestTotalAssets: number;
   latestTotalEquity: number;
-  latestIncomeStatement: any;
-  latestBalanceSheet: any;
-  latestCashFlowStatement: any;
+  latestIncomeStatement: Record<string, unknown>;
+  latestBalanceSheet: Record<string, unknown>;
+  latestCashFlowStatement: Record<string, unknown>;
 }
 
 export const RecommendationBanner: React.FC<RecommendationBannerProps> = ({
@@ -21,7 +21,6 @@ export const RecommendationBanner: React.FC<RecommendationBannerProps> = ({
   latestDividend,
   latestNetIncome,
   latestTotalAssets,
-  latestTotalEquity,
   latestIncomeStatement,
   latestBalanceSheet,
   latestCashFlowStatement

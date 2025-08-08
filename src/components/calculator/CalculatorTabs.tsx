@@ -3,7 +3,7 @@ import { Check, Calculator, TrendingUp, BarChart3, DollarSign, Info } from 'luci
 import { CalculatorInfoCard } from './CalculatorInfoCard';
 import { getRecommendedCalculators } from '../../constants/calculatorInfo';
 
-export type CalculatorModel = 'DCF' | 'DDM' | 'NAV' | 'EPV' | 'SUMMARY';
+export type CalculatorModel = 'DCF' | 'DDM' | 'RELATIVE' | 'NAV' | 'EPV' | 'SUMMARY';
 
 interface CalculatorTab {
   id: CalculatorModel;
@@ -20,7 +20,7 @@ interface CalculatorTabsProps {
   onTabChange: (tab: CalculatorModel) => void;
   completedCalculators: Set<CalculatorModel>;
   results: Partial<Record<CalculatorModel, number>>;
-  companyData?: any; // For smart recommendations
+  companyData?: Record<string, unknown>; // For smart recommendations
 }
 
 export const CalculatorTabs: React.FC<CalculatorTabsProps> = ({
@@ -52,6 +52,15 @@ export const CalculatorTabs: React.FC<CalculatorTabsProps> = ({
       available: true, // Now available!
       completed: completedCalculators.has('DDM'),
       result: results.DDM
+    },
+    {
+      id: 'RELATIVE',
+      name: 'Relative',
+      description: 'Peer Multiples',
+      icon: <BarChart3 className="h-4 w-4" />,
+      available: true, // Now available!
+      completed: completedCalculators.has('RELATIVE'),
+      result: results.RELATIVE
     },
     {
       id: 'NAV',
@@ -177,12 +186,12 @@ export const CalculatorTabs: React.FC<CalculatorTabsProps> = ({
         <div className="px-4 pb-2">
           <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
             <span>Analysis Progress</span>
-            <span>{completedCalculators.size} of 4 models completed</span>
+<span>{completedCalculators.size} of 5 models completed</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-1.5">
             <div 
               className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
-              style={{ width: `${(completedCalculators.size / 4) * 100}%` }}
+              style={{ width: `${(completedCalculators.size / 5) * 100}%` }}
             />
           </div>
         </div>

@@ -2,9 +2,8 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { TrendingUp, TrendingDown, Info, DollarSign, BarChart3 } from 'lucide-react';
-import { formatCurrency } from '../../utils/formatters';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import type { DDMResult, DDMSensitivity } from '../../types/ddm';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import type { DDMResult, DDMSensitivity, DDMInputs } from '../../types/ddm';
 import { calculateDDMSensitivity } from '../../utils/ddmCalculator';
 
 interface DDMResultsProps {
@@ -50,7 +49,7 @@ export const DDMResults: React.FC<DDMResultsProps> = ({
         modelType: result.modelType,
         gordonGrowthRate: inputs.gordonGrowthRate,
         stableGrowthRate: inputs.stableGrowthRate
-      } as any;
+      } as DDMInputs;
       
       const sens = calculateDDMSensitivity(ddmInputs);
       setSensitivity(sens);

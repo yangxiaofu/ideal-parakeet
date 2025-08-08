@@ -4,6 +4,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { DCFCalculator } from '../components/calculator/DCFCalculator';
 import { DDMCalculator } from '../components/calculator/DDMCalculator';
+import { RelativeValuationCalculator } from '../components/calculator/RelativeValuationCalculator';
 import { CalculatorTabs, type CalculatorModel } from '../components/calculator/CalculatorTabs';
 import { CalculatorSummary } from '../components/calculator/CalculatorSummary';
 import { FinancialHistoryTable } from '../components/dashboard/FinancialHistoryTable';
@@ -319,6 +320,27 @@ export const Dashboard: React.FC = () => {
                       .sort((a, b) => parseInt(b.year) - parseInt(a.year))}
                     historicalShares={financialData.historicalShares}
                     onCalculationComplete={(result) => handleCalculatorComplete('DDM', result)}
+                  />
+                )}
+
+                {activeTab === 'RELATIVE' && (
+                  <RelativeValuationCalculator
+                    symbol={companyData.symbol}
+                    currentPrice={getCurrentPrice()}
+                    defaultCompanyData={{
+                      symbol: companyData.symbol,
+                      name: companyData.name,
+                      marketCap: (getCurrentPrice() || 0) * financialData.latestShares,
+                      enterpriseValue: (getCurrentPrice() || 0) * financialData.latestShares, // Simplified: assuming no net debt
+                      revenue: financialData.latestIncomeStatement?.revenue || 0,
+                      ebitda: (financialData.latestIncomeStatement?.revenue || 0) * 0.2, // Estimate EBITDA as 20% of revenue
+                      netIncome: financialData.latestNetIncome,
+                      bookValue: financialData.latestTotalEquity,
+                      sharesOutstanding: financialData.latestShares,
+                      debt: 0, // totalDebt not available in current schema
+                      cash: 0 // cash not available in current schema
+                    }}
+                    onCalculationComplete={(result) => handleCalculatorComplete('RELATIVE', result)}
                   />
                 )}
 

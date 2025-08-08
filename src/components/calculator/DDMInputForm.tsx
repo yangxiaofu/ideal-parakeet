@@ -122,7 +122,7 @@ export const DDMInputForm: React.FC<DDMInputFormProps> = ({
     setGrowthPhases(newPhases);
   };
   
-  const updateGrowthPhase = (index: number, field: keyof GrowthPhase, value: any) => {
+  const updateGrowthPhase = (index: number, field: keyof GrowthPhase, value: number | string) => {
     const newPhases = [...growthPhases];
     newPhases[index] = { ...newPhases[index], [field]: value };
     setGrowthPhases(newPhases);

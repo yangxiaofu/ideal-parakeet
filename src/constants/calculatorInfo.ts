@@ -154,7 +154,7 @@ export const CALCULATOR_INFO: Record<string, CalculatorInfo> = {
 };
 
 // Helper function to get recommended calculators based on company characteristics
-export function getRecommendedCalculators(companyData: any): {
+export function getRecommendedCalculators(companyData: Record<string, unknown>): {
   recommended: string[];
   caution: string[];
   notRecommended: string[];
@@ -169,7 +169,7 @@ export function getRecommendedCalculators(companyData: any): {
 
   // Check if company has consistent cash flows (for DCF)
   if (companyData.cashFlowStatement && companyData.cashFlowStatement.length >= 3) {
-    const cashFlows = companyData.cashFlowStatement.slice(0, 3).map((cf: any) => cf.freeCashFlow);
+    const cashFlows = companyData.cashFlowStatement.slice(0, 3).map((cf: Record<string, unknown>) => cf.freeCashFlow as number);
     const avgCashFlow = cashFlows.reduce((a: number, b: number) => a + b, 0) / cashFlows.length;
     const allPositive = cashFlows.every((cf: number) => cf > 0);
     
@@ -190,7 +190,7 @@ export function getRecommendedCalculators(companyData: any): {
     const latestDividend = companyData.cashFlowStatement[0].dividendsPaid;
     const hasConsistentDividends = companyData.cashFlowStatement
       .slice(0, Math.min(3, companyData.cashFlowStatement.length))
-      .every((cf: any) => cf.dividendsPaid && cf.dividendsPaid < 0); // Dividends are negative in cash flow
+      .every((cf: Record<string, unknown>) => cf.dividendsPaid && (cf.dividendsPaid as number) < 0); // Dividends are negative in cash flow
     
     if (hasConsistentDividends) {
       recommendations.recommended.push('DDM');
@@ -224,7 +224,7 @@ export function getRecommendedCalculators(companyData: any): {
 
   // Check earnings stability (for EPV)
   if (companyData.incomeStatement && companyData.incomeStatement.length >= 3) {
-    const earnings = companyData.incomeStatement.slice(0, 3).map((is: any) => is.netIncome);
+    const earnings = companyData.incomeStatement.slice(0, 3).map((is: Record<string, unknown>) => is.netIncome as number);
     const allPositive = earnings.every((e: number) => e > 0);
     const avgEarnings = earnings.reduce((a: number, b: number) => a + b, 0) / earnings.length;
     
