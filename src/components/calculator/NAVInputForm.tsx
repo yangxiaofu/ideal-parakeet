@@ -217,7 +217,7 @@ export const NAVInputForm: React.FC<NAVInputFormProps> = ({
     return initialAdjustments;
   });
 
-  const [sharesOutstanding, setSharesOutstanding] = useState<number>(100_000_000);
+  const [sharesOutstanding, setSharesOutstanding] = useState<number>(balanceSheet.sharesOutstanding || 100_000_000);
   const [includeIntangibles, setIncludeIntangibles] = useState(true);
   const [includeGoodwill, setIncludeGoodwill] = useState(false);
   const [useMarketValues, setUseMarketValues] = useState(true);
