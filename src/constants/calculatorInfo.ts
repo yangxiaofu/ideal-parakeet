@@ -150,6 +150,43 @@ export const CALCULATOR_INFO: Record<string, CalculatorInfo> = {
       'Sustainable competitive advantage'
     ],
     icon: '📊'
+  },
+  
+  RELATIVE: {
+    id: 'RELATIVE',
+    name: 'Relative',
+    fullName: 'Relative Valuation (Peer Multiples)',
+    description: 'Values companies by comparing them to similar publicly traded companies using financial ratios and multiples. This method reflects how the market currently prices comparable businesses.',
+    valuationType: 'Relative valuation - determines value based on how similar companies are priced by the market',
+    investmentStyle: ['Market-Based Investing', 'Relative Value Investing', 'Sector Analysis'],
+    bestFor: [
+      'Market benchmarking and sector comparison',
+      'Quick valuation screening across multiple stocks',
+      'Identifying relatively cheap stocks within sectors',
+      'Reality checks against intrinsic value estimates',
+      'Understanding market sentiment and pricing trends'
+    ],
+    idealBusinesses: [
+      'Companies with clear industry peers and competitors',
+      'Mature industries with standardized business models',
+      'Sectors with multiple comparable public companies',
+      'Businesses in efficient markets with active trading',
+      'Companies where market multiples are meaningful'
+    ],
+    notIdealFor: [
+      'Unique companies without true comparables',
+      'Rapidly changing or disrupted industries',
+      'Companies with vastly different business models',
+      'Markets experiencing bubbles or extreme mispricing',
+      'Early-stage companies in emerging sectors'
+    ],
+    keyRequirements: [
+      'Robust peer group of comparable companies',
+      'Relevant and meaningful financial multiples',
+      'Assumption of market efficiency over time',
+      'Understanding of business model similarities'
+    ],
+    icon: '📊'
   }
 };
 
@@ -311,6 +348,32 @@ export function getRecommendedCalculators(companyData: {
       recommendations.notRecommended.push('EPV');
       recommendations.reasons['EPV'] = 'Inconsistent or negative earnings';
     }
+  }
+
+  // Relative valuation is generally applicable for most public companies
+  // The key factor is whether there are meaningful peers available
+  if (companyData.incomeStatement && Array.isArray(companyData.incomeStatement) && companyData.incomeStatement.length > 0) {
+    const latestIncome = companyData.incomeStatement[0];
+    const hasRevenue = latestIncome.revenue > 0;
+    const hasEarnings = latestIncome.netIncome > 0;
+    
+    if (hasRevenue && hasEarnings) {
+      // Companies with both revenue and earnings are ideal for relative valuation
+      recommendations.recommended.push('RELATIVE');
+      recommendations.reasons['RELATIVE'] = 'Strong financials suitable for peer comparison';
+    } else if (hasRevenue) {
+      // Companies with revenue but no earnings can still use revenue multiples
+      recommendations.caution.push('RELATIVE');
+      recommendations.reasons['RELATIVE'] = 'Revenue-based multiples available, but limited by lack of profitability';
+    } else {
+      // Very early stage companies without revenue
+      recommendations.notRecommended.push('RELATIVE');
+      recommendations.reasons['RELATIVE'] = 'Insufficient financial metrics for meaningful peer comparison';
+    }
+  } else {
+    // Default to caution if we don't have enough data to assess
+    recommendations.caution.push('RELATIVE');
+    recommendations.reasons['RELATIVE'] = 'Limited financial data - peer comparison may be challenging';
   }
 
   return recommendations;

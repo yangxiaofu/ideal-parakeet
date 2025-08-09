@@ -362,7 +362,7 @@ export const EPVInputForm: React.FC<EPVInputFormProps> = ({
             <Input
               id="manual-cost"
               type="number"
-              step="0.01"
+              step="any"
               min="0"
               max="100"
               placeholder="e.g., 12"
@@ -377,7 +377,7 @@ export const EPVInputForm: React.FC<EPVInputFormProps> = ({
               <Input
                 id="risk-free-rate"
                 type="number"
-                step="0.01"
+                step="any"
                 min="0"
                 max="20"
                 value={riskFreeRate}
@@ -389,7 +389,7 @@ export const EPVInputForm: React.FC<EPVInputFormProps> = ({
               <Input
                 id="market-risk-premium"
                 type="number"
-                step="0.01"
+                step="any"
                 min="0"
                 max="20"
                 value={marketRiskPremium}
@@ -401,7 +401,7 @@ export const EPVInputForm: React.FC<EPVInputFormProps> = ({
               <Input
                 id="beta"
                 type="number"
-                step="0.01"
+                step="any"
                 min="0"
                 max="5"
                 value={beta}
@@ -413,7 +413,7 @@ export const EPVInputForm: React.FC<EPVInputFormProps> = ({
               <Input
                 id="tax-rate"
                 type="number"
-                step="0.01"
+                step="any"
                 min="0"
                 max="100"
                 value={taxRate}

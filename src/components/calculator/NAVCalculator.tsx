@@ -9,6 +9,7 @@ interface NAVCalculatorProps {
   symbol?: string;
   currentPrice?: number;
   balanceSheet?: BalanceSheet;
+  sharesOutstanding?: number;
   onCalculationComplete?: (navPerShare: number) => void;
 }
 
@@ -16,6 +17,7 @@ export const NAVCalculator: React.FC<NAVCalculatorProps> = ({
   symbol, 
   currentPrice,
   balanceSheet,
+  sharesOutstanding,
   onCalculationComplete
 }) => {
   const [result, setResult] = useState<NAVResult | null>(null);
@@ -146,6 +148,7 @@ export const NAVCalculator: React.FC<NAVCalculatorProps> = ({
           onSubmit={handleCalculate}
           loading={loading}
           balanceSheet={balanceSheet}
+          sharesOutstanding={sharesOutstanding}
         />
       )}
 

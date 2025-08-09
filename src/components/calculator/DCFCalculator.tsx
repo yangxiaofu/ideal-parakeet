@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DCFInputForm } from './DCFInputForm';
 import { DCFResults } from './DCFResults';
 import { calculateDCFIntrinsicValue } from '../../utils/dcfCalculator';
+import { useSmartDCFCalculator } from '../../hooks/useSmartCalculator';
 import type { DCFInputs, DCFResult } from '../../types';
 
 interface HistoricalValue {
@@ -16,7 +17,14 @@ interface DCFCalculatorProps {
   defaultSharesOutstanding?: number;
   historicalFCF?: HistoricalValue[];
   historicalShares?: HistoricalValue[];
-  onCalculationComplete?: (intrinsicValue: number) => void;
+  onCalculationComplete?: (
+    intrinsicValue: number, 
+    metadata?: {
+      confidence?: 'high' | 'medium' | 'low';
+      fromCache?: boolean;
+      cacheAge?: string;
+    }
+  ) => void;
 }
 
 export const DCFCalculator: React.FC<DCFCalculatorProps> = ({ 
@@ -29,15 +37,37 @@ export const DCFCalculator: React.FC<DCFCalculatorProps> = ({
   onCalculationComplete
 }) => {
   const [result, setResult] = useState<DCFResult | null>(null);
+  const [showCachedResult, setShowCachedResult] = useState(false);
+
+  // Smart calculator with auto-save and caching
+  const {
+    calculate: smartCalculate,
+    cachedResult,
+    isCacheAvailable,
+    isCalculationFresh,
+    cacheAge,
+    isLoadingCache,
+    isSaving,
+    lastError
+  } = useSmartDCFCalculator(
+    symbol || '',
+    calculateDCFIntrinsicValue,
+    {
+      companyName: symbol ? `${symbol} Corporation` : undefined,
+      autoSave: true,
+      showCacheIndicators: true
+    }
+  );
+
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const error = lastError?.message || null;
 
   const handleCalculate = async (inputs: DCFInputs) => {
     setLoading(true);
-    setError(null);
+    setShowCachedResult(false);
     
     try {
-      const dcfResult = calculateDCFIntrinsicValue(inputs);
+      const dcfResult = await smartCalculate(inputs);
       
       // Add current price and upside calculation if available
       if (currentPrice && currentPrice > 0) {
@@ -51,23 +81,60 @@ export const DCFCalculator: React.FC<DCFCalculatorProps> = ({
         setResult(dcfResult);
       }
       
-      // Report the result to parent
+      // Report the result to parent with metadata
       if (onCalculationComplete) {
-        onCalculationComplete(dcfResult.intrinsicValuePerShare);
+        onCalculationComplete(dcfResult.intrinsicValuePerShare, {
+          confidence: 'medium', // DCF typically has medium confidence
+          fromCache: false,
+          cacheAge: undefined
+        });
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred during calculation';
-      setError(errorMessage);
+      console.error('DCF calculation failed:', err);
       setResult(null);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleUseCachedResult = () => {
+    if (cachedResult) {
+      // Add current price and upside calculation if available
+      if (currentPrice && currentPrice > 0) {
+        const upside = ((cachedResult.intrinsicValuePerShare - currentPrice) / currentPrice) * 100;
+        setResult({
+          ...cachedResult,
+          currentPrice,
+          upside
+        });
+      } else {
+        setResult(cachedResult);
+      }
+      
+      setShowCachedResult(true);
+      
+      // Report the cached result to parent with metadata
+      if (onCalculationComplete) {
+        onCalculationComplete(cachedResult.intrinsicValuePerShare, {
+          confidence: 'medium', // Maintain same confidence
+          fromCache: true,
+          cacheAge: cacheAge || undefined
+        });
+      }
+    }
+  };
+
   const handleReset = () => {
     setResult(null);
-    setError(null);
+    setShowCachedResult(false);
   };
+
+  // Auto-load cached result if available and fresh
+  useEffect(() => {
+    if (isCacheAvailable && isCalculationFresh && !result && !showCachedResult) {
+      handleUseCachedResult();
+    }
+  }, [isCacheAvailable, isCalculationFresh, result, showCachedResult]);
 
   return (
     <div className="space-y-6">
@@ -99,6 +166,102 @@ export const DCFCalculator: React.FC<DCFCalculatorProps> = ({
             <span className="text-sm font-medium text-blue-900">Current Market Price</span>
             <span className="text-lg font-semibold text-blue-900">${currentPrice.toFixed(2)}</span>
           </div>
+        </div>
+      )}
+
+      {/* Cache Status and Auto-Save Indicators */}
+      {(isCacheAvailable || isSaving || isLoadingCache) && (
+        <div className="space-y-3">
+          {/* Loading Cache */}
+          {isLoadingCache && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                <span className="text-sm text-gray-600">Loading previous calculations...</span>
+              </div>
+            </div>
+          )}
+
+          {/* Cached Result Available */}
+          {isCacheAvailable && !showCachedResult && !result && (
+            <div className={`border rounded-lg p-4 ${
+              isCalculationFresh 
+                ? 'bg-green-50 border-green-200' 
+                : 'bg-yellow-50 border-yellow-200'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className={`w-2 h-2 rounded-full ${
+                    isCalculationFresh ? 'bg-green-400' : 'bg-yellow-400'
+                  }`}></div>
+                  <div>
+                    <span className={`text-sm font-medium ${
+                      isCalculationFresh ? 'text-green-900' : 'text-yellow-900'
+                    }`}>
+                      {isCalculationFresh ? 'Fresh calculation available' : 'Previous calculation found'}
+                    </span>
+                    {cacheAge && (
+                      <p className={`text-xs mt-1 ${
+                        isCalculationFresh ? 'text-green-700' : 'text-yellow-700'
+                      }`}>
+                        Calculated {cacheAge}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={handleUseCachedResult}
+                  className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                    isCalculationFresh
+                      ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                      : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                  }`}
+                >
+                  Use Previous Result
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Cached Result Being Shown */}
+          {showCachedResult && result && (
+            <div className={`border rounded-lg p-3 ${
+              isCalculationFresh 
+                ? 'bg-green-50 border-green-200' 
+                : 'bg-yellow-50 border-yellow-200'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className={`w-2 h-2 rounded-full ${
+                    isCalculationFresh ? 'bg-green-400' : 'bg-yellow-400'
+                  }`}></div>
+                  <span className={`text-xs ${
+                    isCalculationFresh ? 'text-green-700' : 'text-yellow-700'
+                  }`}>
+                    Showing cached result from {cacheAge}
+                  </span>
+                </div>
+                <button
+                  onClick={handleReset}
+                  className={`text-xs underline ${
+                    isCalculationFresh ? 'text-green-700 hover:text-green-900' : 'text-yellow-700 hover:text-yellow-900'
+                  }`}
+                >
+                  Recalculate with new data
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Auto-Save Status */}
+          {isSaving && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                <span className="text-sm text-blue-700">Saving calculation...</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

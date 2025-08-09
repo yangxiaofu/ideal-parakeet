@@ -11,11 +11,29 @@ import { CalculatorTabs, type CalculatorModel } from '../components/calculator/C
 import { CalculatorSummary } from '../components/calculator/CalculatorSummary';
 import { FinancialHistoryTable } from '../components/dashboard/FinancialHistoryTable';
 import { RecommendationBanner } from '../components/dashboard/RecommendationBanner';
+import { MoatAnalysis } from '../components/analysis/MoatAnalysis';
 import { fmpApi } from '../services/fmpApi';
 import { formatCurrency, formatShares, formatEPS, formatYear } from '../utils/formatters';
 import { useFinancialData } from '../hooks/useFinancialData';
 import { useMetricHighlighting } from '../hooks/useMetricHighlighting';
+import { calculateMoatFromFinancials } from '../utils/moatAnalysis';
+import { getMockCompanyData, isDemo } from '../utils/mockData';
 import type { CompanyFinancials } from '../types';
+
+// Import debug helpers in development
+if (import.meta.env.DEV) {
+  import('../utils/debugHelper');
+  import('../utils/testMockData');
+}
+
+// Enhanced calculator result with metadata
+interface CalculatorResultMetadata {
+  value: number;
+  timestamp: Date;
+  confidence?: 'high' | 'medium' | 'low';
+  fromCache?: boolean;
+  cacheAge?: string;
+}
 
 export const Dashboard: React.FC = () => {
   const [ticker, setTicker] = useState('');
@@ -24,7 +42,25 @@ export const Dashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<CalculatorModel>('DCF');
   const [completedCalculators, setCompletedCalculators] = useState<Set<CalculatorModel>>(new Set());
-  const [calculatorResults, setCalculatorResults] = useState<Partial<Record<CalculatorModel, number>>>({});
+  const [calculatorResults, setCalculatorResults] = useState<Partial<Record<CalculatorModel, CalculatorResultMetadata>>>({});
+  
+  // Log when component mounts
+  React.useEffect(() => {
+    console.log('Dashboard component mounted');
+    console.log('Environment:', import.meta.env.MODE);
+    console.log('API configured:', !!import.meta.env.VITE_FMP_API_KEY);
+  }, []);
+  
+  // Log when companyData changes
+  React.useEffect(() => {
+    console.log('Company data changed:', {
+      hasData: !!companyData,
+      symbol: companyData?.symbol,
+      name: companyData?.name,
+      isLoading: loading,
+      hasError: !!error
+    });
+  }, [companyData, loading, error]);
   
   // Use custom hooks for data processing and highlighting
   const financialData = useFinancialData(companyData);
@@ -32,8 +68,16 @@ export const Dashboard: React.FC = () => {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ticker.trim()) return;
+    console.log('=== handleSearch called ===');
+    console.log('Event:', e);
+    console.log('Ticker value:', ticker);
+    
+    if (!ticker.trim()) {
+      console.log('No ticker entered - returning');
+      return;
+    }
 
+    console.log('Starting search for ticker:', ticker);
     setLoading(true);
     setError(null);
     setCompanyData(null);
@@ -42,14 +86,71 @@ export const Dashboard: React.FC = () => {
     setCalculatorResults({});
     
     try {
-      console.log('Fetching data for:', ticker);
+      // Check if using demo mode
+      console.log('Checking isDemo for ticker:', ticker);
+      const isDemoMode = isDemo(ticker);
+      console.log('isDemo result:', isDemoMode);
+      
+      if (isDemoMode) {
+        console.log('Demo mode activated - loading mock data');
+        try {
+          const mockData = getMockCompanyData(ticker);
+          console.log('Mock data structure:', {
+            hasData: !!mockData,
+            symbol: mockData?.symbol,
+            name: mockData?.name,
+            price: mockData?.currentPrice,
+            incomeStmtCount: mockData?.incomeStatement?.length,
+            balanceSheetCount: mockData?.balanceSheet?.length,
+            cashFlowCount: mockData?.cashFlowStatement?.length
+          });
+          
+          if (!mockData) {
+            throw new Error('Mock data returned null');
+          }
+          
+          setCompanyData(mockData);
+          console.log('Company data set - resetting loading state');
+          setLoading(false);  // Reset loading state for demo mode
+          console.log('Demo mode complete - returning');
+          return;
+        } catch (demoError) {
+          console.error('Error in demo mode:', demoError);
+          setError('Failed to load demo data. Please check console for details.');
+          setLoading(false);
+          return;
+        }
+      }
+      
+      console.log('Calling FMP API for ticker:', ticker.trim());
       const data = await fmpApi.getCompanyFinancials(ticker.trim());
+      console.log('Successfully fetched data:', data);
       setCompanyData(data);
     } catch (error: unknown) {
-      console.error('Search failed:', error);
-      setError(error instanceof Error ? error.message : 'Failed to fetch company data');
+      console.error('Search failed with error:', error);
+      
+      // More detailed error handling
+      let errorMessage = 'Failed to fetch company data';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('API key')) {
+          errorMessage = 'API key is missing or invalid. Please check your configuration.';
+        } else if (error.message.includes('404')) {
+          errorMessage = `Ticker "${ticker}" not found. Please check the symbol and try again.`;
+        } else if (error.message.includes('429') || error.message.includes('rate limit')) {
+          errorMessage = 'Daily API limit reached (250 calls/day for free tier). The limit resets at midnight EST. Consider upgrading to a paid plan for more requests.';
+        } else if (error.message.includes('network')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      setError(errorMessage);
+      console.error('Error details:', errorMessage);
     } finally {
       setLoading(false);
+      console.log('Search completed, loading state:', false);
     }
   };
 
@@ -57,9 +158,26 @@ export const Dashboard: React.FC = () => {
     setActiveTab(tab);
   };
 
-  const handleCalculatorComplete = (model: CalculatorModel, result: number) => {
+  const handleCalculatorComplete = (
+    model: CalculatorModel, 
+    result: number, 
+    metadata?: {
+      confidence?: 'high' | 'medium' | 'low';
+      fromCache?: boolean;
+      cacheAge?: string;
+    }
+  ) => {
     setCompletedCalculators(prev => new Set([...prev, model]));
-    setCalculatorResults(prev => ({ ...prev, [model]: result }));
+    setCalculatorResults(prev => ({ 
+      ...prev, 
+      [model]: {
+        value: result,
+        timestamp: new Date(),
+        confidence: metadata?.confidence || 'medium',
+        fromCache: metadata?.fromCache || false,
+        cacheAge: metadata?.cacheAge
+      }
+    }));
   };
 
   const getCurrentPrice = (): number | undefined => {
@@ -92,6 +210,9 @@ export const Dashboard: React.FC = () => {
                 <p className="text-sm text-gray-400">
                   Enter a ticker symbol to calculate intrinsic value
                 </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  💡 Tip: Enter "DEMO" to test with sample data (no API calls)
+                </p>
               </div>
 
               <form onSubmit={handleSearch} className="space-y-4">
@@ -109,28 +230,62 @@ export const Dashboard: React.FC = () => {
                 <Button 
                   type="submit" 
                   disabled={loading || !ticker.trim()}
-                  className="w-full py-4 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-2xl transition-all duration-200 disabled:bg-gray-200"
+                  className="w-full py-4 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-2xl transition-all duration-200 disabled:bg-gray-200 disabled:text-gray-500"
                 >
-                  {loading ? 'Analyzing...' : 'Analyze Company'}
+                  {loading ? (
+                    <div className="flex items-center justify-center space-x-2">
+                      <svg className="animate-spin h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Fetching Financial Data...</span>
+                    </div>
+                  ) : (
+                    'Analyze Company'
+                  )}
                 </Button>
               </form>
             </div>
           </div>
 
-          {/* Error Display - Minimal */}
+          {/* Error Display - Enhanced */}
           {error && (
-            <div className="max-w-md mx-auto">
-              <div className="bg-red-50 border border-red-100 rounded-2xl p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <svg className="h-4 w-4 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+            <div className="max-w-md mx-auto animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-5">
+                <div className="flex items-start space-x-3">
+                  <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <svg className="h-5 w-5 text-red-600" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                     </svg>
                   </div>
                   <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-red-800 mb-1">Unable to fetch data</h3>
                     <p className="text-sm text-red-700">
                       {error}
                     </p>
+                    {error.includes('API key') && (
+                      <p className="text-xs text-red-600 mt-2">
+                        Please ensure your .env file contains a valid VITE_FMP_API_KEY
+                      </p>
+                    )}
+                    {error.includes('rate limit') && (
+                      <div className="text-xs text-red-600 mt-3 space-y-2 border-t border-red-200 pt-3">
+                        <p className="font-semibold">Solutions:</p>
+                        <ul className="list-disc list-inside space-y-1 ml-2">
+                          <li>Wait until midnight EST for the limit to reset</li>
+                          <li>Upgrade to a paid FMP plan ($14.99/month for 750 calls/day)</li>
+                          <li>Use manual input mode in the calculators (no API needed)</li>
+                        </ul>
+                        <p className="mt-2">
+                          <a href="https://financialmodelingprep.com/developer/docs/pricing" 
+                             target="_blank" 
+                             rel="noopener noreferrer"
+                             className="text-blue-600 hover:text-blue-700 underline">
+                            View FMP pricing plans →
+                          </a>
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -254,6 +409,13 @@ export const Dashboard: React.FC = () => {
                 </div>
               </div>
 
+              {/* Competitive MOAT Analysis */}
+              <MoatAnalysis 
+                analysis={calculateMoatFromFinancials(companyData)}
+                companySymbol={companyData.symbol}
+                className="mt-8"
+              />
+
               {/* Financial History Table */}
               <FinancialHistoryTable
                 incomeStatements={financialData.sortedIncomeStatements}
@@ -276,9 +438,9 @@ export const Dashboard: React.FC = () => {
                 latestNetIncome={financialData.latestNetIncome}
                 latestTotalAssets={financialData.latestTotalAssets}
                 latestTotalEquity={financialData.latestTotalEquity}
-                latestIncomeStatement={financialData.latestIncomeStatement}
-                latestBalanceSheet={financialData.latestBalanceSheet}
-                latestCashFlowStatement={financialData.latestCashFlowStatement}
+                latestIncomeStatement={(financialData.latestIncomeStatement as unknown as Record<string, unknown>) || {}}
+                latestBalanceSheet={(financialData.latestBalanceSheet as unknown as Record<string, unknown>) || {}}
+                latestCashFlowStatement={(financialData.latestCashFlowStatement as unknown as Record<string, unknown>) || {}}
               />
               
               {/* Calculator Tabs */}
@@ -355,13 +517,7 @@ export const Dashboard: React.FC = () => {
                     symbol={companyData.symbol}
                     currentPrice={getCurrentPrice()}
                     balanceSheet={financialData.latestBalanceSheet || undefined}
-                    historicalBookValues={companyData.balanceSheet
-                      .slice(0, 5)
-                      .map(bs => ({
-                        year: bs.date.split('-')[0],
-                        value: bs.bookValuePerShare
-                      }))
-                      .sort((a, b) => parseInt(b.year) - parseInt(a.year))}
+                    sharesOutstanding={companyData.sharesOutstanding}
                     onCalculationComplete={(result) => handleCalculatorComplete('NAV', result)}
                   />
                 )}
@@ -391,11 +547,14 @@ export const Dashboard: React.FC = () => {
                     symbol={companyData.symbol}
                     companyName={companyData.name}
                     currentPrice={getCurrentPrice()}
-                    results={Object.entries(calculatorResults).map(([model, value]) => ({
+                    results={Object.entries(calculatorResults).map(([model, metadata]) => ({
                       model: model as CalculatorModel,
-                      intrinsicValue: value,
+                      intrinsicValue: metadata.value,
                       currentPrice: getCurrentPrice(),
-                      confidence: 'medium' // This should come from the calculator
+                      confidence: metadata.confidence,
+                      timestamp: metadata.timestamp,
+                      fromCache: metadata.fromCache,
+                      cacheAge: metadata.cacheAge
                     }))}
                   />
                 )}

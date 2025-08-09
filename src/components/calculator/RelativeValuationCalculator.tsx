@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { Card, CardContent } from '../ui/card';
+import { Button } from '../ui/button';
+import { Info } from 'lucide-react';
 import { RelativeValuationInputForm } from './RelativeValuationInputForm';
 import { RelativeValuationResults } from './RelativeValuationResults';
+import { CalculatorInfoCard } from './CalculatorInfoCard';
 import { calculateRelativeValuation } from '../../utils/relativeValuationCalculator';
 import type { 
   RelativeValuationInputs, 
@@ -40,6 +43,7 @@ export const RelativeValuationCalculator: React.FC<RelativeValuationCalculatorPr
   const [lastInputs, setLastInputs] = useState<RelativeValuationInputs | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
 
   const handleCalculate = async (inputs: RelativeValuationInputs) => {
     try {
@@ -81,6 +85,34 @@ export const RelativeValuationCalculator: React.FC<RelativeValuationCalculatorPr
 
   return (
     <div className="space-y-6">
+      {/* Header with Info Button */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Relative Valuation (Peer Multiples)
+            {symbol && <span className="text-blue-600 ml-2">({symbol})</span>}
+          </h2>
+          <p className="text-gray-600 mt-1">
+            Compare against industry peers using valuation multiples
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowInfo(!showInfo)}
+          className="flex items-center gap-2"
+        >
+          <Info className="h-4 w-4" />
+          {showInfo ? 'Hide Info' : 'When to Use'}
+        </Button>
+      </div>
+
+      {/* Calculator Info Card */}
+      <CalculatorInfoCard
+        calculatorId="RELATIVE"
+        isOpen={showInfo}
+        onClose={() => setShowInfo(false)}
+      />
       {/* Input Section */}
       {!result && (
         <Card>
@@ -163,37 +195,17 @@ export const RelativeValuationCalculator: React.FC<RelativeValuationCalculatorPr
         </>
       )}
 
-      {/* Instructions for first-time users */}
+      {/* Quick start hint for first-time users */}
       {!result && !error && !isCalculating && (
         <Card>
           <CardContent className="pt-6">
-            <div className="text-center py-8">
-              <h3 className="text-lg font-semibold mb-2">Relative Valuation Analysis</h3>
-              <p className="text-sm text-gray-600 max-w-2xl mx-auto mb-4">
-                Compare your company against industry peers using multiple valuation ratios.
-                This method helps identify whether a stock is fairly valued, overvalued, or undervalued
-                relative to comparable companies.
+            <div className="text-center py-6">
+              <p className="text-sm text-gray-600 max-w-2xl mx-auto mb-2">
+                Compare your company against industry peers using valuation multiples like P/E, P/S, and EV/EBITDA.
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto text-left mt-6">
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <h4 className="font-medium text-sm mb-2">📊 Multiple Ratios</h4>
-                  <p className="text-xs text-gray-600">
-                    Choose from P/E, P/S, EV/EBITDA, P/B, and PEG ratios based on your company's characteristics
-                  </p>
-                </div>
-                <div className="bg-green-50 rounded-lg p-4">
-                  <h4 className="font-medium text-sm mb-2">👥 Peer Analysis</h4>
-                  <p className="text-xs text-gray-600">
-                    Add comparable companies to create a robust peer group for accurate benchmarking
-                  </p>
-                </div>
-                <div className="bg-purple-50 rounded-lg p-4">
-                  <h4 className="font-medium text-sm mb-2">📈 Valuation Ranges</h4>
-                  <p className="text-xs text-gray-600">
-                    Get conservative, moderate, and optimistic value ranges with confidence indicators
-                  </p>
-                </div>
-              </div>
+              <p className="text-xs text-gray-500">
+                💡 Click "When to Use" above to learn when relative valuation is most effective
+              </p>
             </div>
           </CardContent>
         </Card>

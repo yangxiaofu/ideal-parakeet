@@ -20,6 +20,7 @@ interface NAVInputFormProps {
   onSubmit: (inputs: NAVInputs) => void;
   loading?: boolean;
   balanceSheet: BalanceSheet;
+  sharesOutstanding?: number;
   // historicalBookValues?: HistoricalValue[];
 }
 
@@ -173,6 +174,7 @@ export const NAVInputForm: React.FC<NAVInputFormProps> = ({
   onSubmit,
   loading = false,
   balanceSheet,
+  sharesOutstanding,
   // historicalBookValues
 }) => {
   // Initialize asset adjustments with estimated values
@@ -217,7 +219,7 @@ export const NAVInputForm: React.FC<NAVInputFormProps> = ({
     return initialAdjustments;
   });
 
-  const [sharesOutstanding, setSharesOutstanding] = useState<number>(balanceSheet.sharesOutstanding || 100_000_000);
+  const [sharesOutstandingState, setSharesOutstanding] = useState<number>(sharesOutstanding || 100_000_000);
   const [includeIntangibles, setIncludeIntangibles] = useState(true);
   const [includeGoodwill, setIncludeGoodwill] = useState(false);
   const [useMarketValues, setUseMarketValues] = useState(true);
@@ -345,7 +347,7 @@ export const NAVInputForm: React.FC<NAVInputFormProps> = ({
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (sharesOutstanding <= 0) {
+    if (sharesOutstandingState <= 0) {
       newErrors.sharesOutstanding = 'Shares outstanding must be positive';
     }
 
@@ -370,7 +372,7 @@ export const NAVInputForm: React.FC<NAVInputFormProps> = ({
       includeIntangibles,
       includeGoodwill,
       useMarketValues,
-      sharesOutstanding
+      sharesOutstanding: sharesOutstandingState
     };
 
     onSubmit(navInputs);
@@ -409,7 +411,7 @@ export const NAVInputForm: React.FC<NAVInputFormProps> = ({
                     id="sharesOutstanding"
                     type="number"
                     placeholder="100000000"
-                    value={sharesOutstanding}
+                    value={sharesOutstandingState}
                     onChange={(e) => setSharesOutstanding(Number(e.target.value) || 0)}
                     disabled={loading}
                   />
@@ -828,7 +830,7 @@ export const NAVInputForm: React.FC<NAVInputFormProps> = ({
                 <div className="text-2xl font-bold text-green-600">{formatCurrency(adjustedBookValue)}</div>
                 <div className="text-sm text-gray-600">Adjusted Book Value</div>
                 <div className="text-xs text-gray-500 mt-1">
-                  {formatCurrency(adjustedBookValue / sharesOutstanding)} per share
+                  {formatCurrency(adjustedBookValue / sharesOutstandingState)} per share
                 </div>
               </div>
             </div>

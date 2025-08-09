@@ -15,11 +15,20 @@ interface CalculatorTab {
   result?: number;
 }
 
+// Enhanced calculator result metadata interface
+interface CalculatorResultMetadata {
+  value: number;
+  timestamp: Date;
+  confidence?: 'high' | 'medium' | 'low';
+  fromCache?: boolean;
+  cacheAge?: string;
+}
+
 interface CalculatorTabsProps {
   activeTab: CalculatorModel;
   onTabChange: (tab: CalculatorModel) => void;
   completedCalculators: Set<CalculatorModel>;
-  results: Partial<Record<CalculatorModel, number>>;
+  results: Partial<Record<CalculatorModel, CalculatorResultMetadata>>;
   companyData?: Record<string, unknown>; // For smart recommendations
 }
 
@@ -42,7 +51,7 @@ export const CalculatorTabs: React.FC<CalculatorTabsProps> = ({
       icon: <TrendingUp className="h-4 w-4" />,
       available: true,
       completed: completedCalculators.has('DCF'),
-      result: results.DCF
+      result: results.DCF?.value
     },
     {
       id: 'DDM',
@@ -51,7 +60,7 @@ export const CalculatorTabs: React.FC<CalculatorTabsProps> = ({
       icon: <DollarSign className="h-4 w-4" />,
       available: true, // Now available!
       completed: completedCalculators.has('DDM'),
-      result: results.DDM
+      result: results.DDM?.value
     },
     {
       id: 'RELATIVE',
@@ -60,7 +69,7 @@ export const CalculatorTabs: React.FC<CalculatorTabsProps> = ({
       icon: <BarChart3 className="h-4 w-4" />,
       available: true, // Now available!
       completed: completedCalculators.has('RELATIVE'),
-      result: results.RELATIVE
+      result: results.RELATIVE?.value
     },
     {
       id: 'NAV',
@@ -69,7 +78,7 @@ export const CalculatorTabs: React.FC<CalculatorTabsProps> = ({
       icon: <BarChart3 className="h-4 w-4" />,
       available: true, // Now available!
       completed: completedCalculators.has('NAV'),
-      result: results.NAV
+      result: results.NAV?.value
     },
     {
       id: 'EPV',
@@ -78,7 +87,7 @@ export const CalculatorTabs: React.FC<CalculatorTabsProps> = ({
       icon: <Calculator className="h-4 w-4" />,
       available: true, // Now available!
       completed: completedCalculators.has('EPV'),
-      result: results.EPV
+      result: results.EPV?.value
     },
     {
       id: 'SUMMARY',

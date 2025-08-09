@@ -180,41 +180,6 @@ export const EPVResults: React.FC<EPVResultsProps> = ({ result, onReset }) => {
         </div>
       </Card>
       
-      {/* Competitive Moat Analysis */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Competitive Moat Analysis</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="text-center">
-            <div className="text-sm font-medium text-gray-600 mb-1">Economic Moat</div>
-            <Badge className={result.moatAnalysis.hasEconomicMoat ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-              {result.moatAnalysis.hasEconomicMoat ? 'Present' : 'None'}
-            </Badge>
-          </div>
-          <div className="text-center">
-            <div className="text-sm font-medium text-gray-600 mb-1">Moat Strength</div>
-            <Badge variant="outline">{result.moatAnalysis.moatStrength}</Badge>
-          </div>
-          <div className="text-center">
-            <div className="text-sm font-medium text-gray-600 mb-1">Sustainability</div>
-            <Badge variant="outline">{result.moatAnalysis.moatSustainability}</Badge>
-          </div>
-          <div className="text-center">
-            <div className="text-sm font-medium text-gray-600 mb-1">Competitive Pressure</div>
-            <Badge 
-              className={
-                result.moatAnalysis.competitivePressure === 'low' 
-                  ? 'bg-green-100 text-green-800' 
-                  : result.moatAnalysis.competitivePressure === 'medium'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : 'bg-red-100 text-red-800'
-              }
-            >
-              {result.moatAnalysis.competitivePressure}
-            </Badge>
-          </div>
-        </div>
-      </Card>
-      
       {/* Sensitivity Analysis Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Cost of Capital Sensitivity */}

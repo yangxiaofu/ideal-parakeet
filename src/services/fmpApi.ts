@@ -21,6 +21,18 @@ interface FMPIncomeStatement {
   netIncome: number;
   eps: number;
   weightedAverageShsOut: number;
+  
+  // Enhanced fields from FMP API
+  grossProfit?: number;
+  grossProfitRatio?: number;
+  sellingGeneralAndAdministrativeExpenses?: number;
+  researchAndDevelopmentExpenses?: number;
+  operatingExpenses?: number;
+  ebitda?: number;
+  ebitdaratio?: number;
+  interestExpense?: number;
+  incomeTaxExpense?: number;
+  incomeBeforeTax?: number;
 }
 
 interface FMPBalanceSheet {
@@ -85,6 +97,15 @@ interface FMPDividendHistory {
 const API_KEY = import.meta.env.VITE_FMP_API_KEY;
 const API_URL = import.meta.env.VITE_FMP_API_URL;
 
+// Log API configuration status
+if (!API_KEY) {
+  console.error('FMP API key is not configured. Please add VITE_FMP_API_KEY to your .env file');
+}
+
+if (!API_URL) {
+  console.error('FMP API URL is not configured. Please add VITE_FMP_API_URL to your .env file');
+}
+
 class FMPApiError extends Error {
   public status?: number;
   
@@ -97,6 +118,15 @@ class FMPApiError extends Error {
 
 class FMPApiService {
   private async fetchWithErrorHandling(url: string): Promise<unknown> {
+    // Check for API key before making request
+    if (!API_KEY) {
+      throw new FMPApiError('API key is missing. Please configure VITE_FMP_API_KEY in your .env file');
+    }
+    
+    if (!API_URL) {
+      throw new FMPApiError('API URL is missing. Please configure VITE_FMP_API_URL in your .env file');
+    }
+    
     try {
       console.log('FMP API Request:', url.replace(API_KEY, '[API_KEY]'));
       const response = await fetch(url);
@@ -104,14 +134,29 @@ class FMPApiService {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('FMP API Error Response:', response.status, errorText);
-        throw new FMPApiError(
-          `API request failed: ${response.statusText} (${response.status})`,
-          response.status
-        );
+        
+        // Provide more specific error messages based on status code
+        if (response.status === 401) {
+          throw new FMPApiError('Invalid API key. Please check your FMP API key configuration.', response.status);
+        } else if (response.status === 404) {
+          throw new FMPApiError('Symbol not found. Please check the ticker symbol and try again.', response.status);
+        } else if (response.status === 429) {
+          throw new FMPApiError('API rate limit exceeded. Please try again later.', response.status);
+        } else {
+          throw new FMPApiError(
+            `API request failed: ${response.statusText} (${response.status})`,
+            response.status
+          );
+        }
       }
       
       const data = await response.json();
-      console.log('FMP API Response:', data);
+      console.log('FMP API Response received successfully');
+      
+      // Check for empty array response (symbol not found)
+      if (Array.isArray(data) && data.length === 0) {
+        throw new FMPApiError('No data found for this symbol. Please check the ticker and try again.');
+      }
       
       if (data.error) {
         throw new FMPApiError(data.error);
@@ -128,7 +173,7 @@ class FMPApiService {
         throw error;
       }
       console.error('FMP API Network Error:', error);
-      throw new FMPApiError('Network error or invalid response');
+      throw new FMPApiError('Network error. Please check your internet connection and try again.');
     }
   }
 
@@ -175,7 +220,21 @@ class FMPApiService {
       operatingIncome: item.operatingIncome || 0,
       netIncome: item.netIncome || 0,
       eps: item.eps || 0,
-      sharesOutstanding: item.weightedAverageShsOut || 0
+      sharesOutstanding: item.weightedAverageShsOut || 0,
+      
+      // Enhanced fields for MOAT analysis
+      grossProfit: item.grossProfit,
+      grossMargin: item.grossProfitRatio,
+      sellingGeneralAndAdministrative: item.sellingGeneralAndAdministrativeExpenses,
+      researchAndDevelopment: item.researchAndDevelopmentExpenses,
+      operatingExpenses: item.operatingExpenses,
+      ebitda: item.ebitda,
+      ebit: item.operatingIncome, // EBIT is typically operating income
+      interestExpense: item.interestExpense,
+      incomeTaxExpense: item.incomeTaxExpense,
+      effectiveTaxRate: item.incomeBeforeTax && item.incomeTaxExpense 
+        ? item.incomeTaxExpense / item.incomeBeforeTax 
+        : undefined
     }));
   }
 
@@ -188,7 +247,8 @@ class FMPApiService {
       const totalEquity = item.totalStockholdersEquity || 0;
       const totalAssets = item.totalAssets || 0;
       const totalLiabilities = item.totalLiabilities || 0;
-      const sharesOutstanding = item.commonStock || 1;
+      // Note: Shares outstanding not available in balance sheet API, will be provided from company profile
+      const sharesOutstanding = item.commonStock || 1; // This is just for bookValuePerShare calculation
       
       // Enhanced asset calculations
       const cash = item.cashAndCashEquivalents || 0;
@@ -229,18 +289,25 @@ class FMPApiService {
         accruedExpenses: undefined, // Not directly available in FMP
         shortTermDebt: item.shortTermDebt,
         otherCurrentLiabilities: item.otherCurrentLiabilities,
+        deferredRevenue: item.deferredRevenue,
         
         // Non-current liabilities
         longTermDebt: item.longTermDebt,
         pensionObligations: undefined, // Would need to be parsed from other fields
         deferredTaxLiabilities: item.deferredTaxLiabilitiesNonCurrent,
         otherNonCurrentLiabilities: item.otherNonCurrentLiabilities,
+        deferredRevenueNonCurrent: item.deferredRevenueNonCurrent,
         
         // Additional computed fields for comprehensive analysis
         tangibleBookValue,
         workingCapital,
         netTangibleAssets,
-        sharesOutstanding
+        sharesOutstanding,
+        
+        // ROIC calculation fields
+        investedCapital: totalAssets - cash - (item.totalCurrentLiabilities || 0) + (item.shortTermDebt || 0),
+        returnOnAssets: item.netIncome ? item.netIncome / totalAssets : undefined,
+        returnOnEquity: item.netIncome ? item.netIncome / totalEquity : undefined
       };
     });
   }

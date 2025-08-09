@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { TrendingUp, AlertCircle, CheckCircle } from 'lucide-react';
+import { TrendingUp, AlertCircle, CheckCircle, Clock, Archive } from 'lucide-react';
+import { formatRelativeTime, getTimestampColor } from '../../utils/dateFormatters';
 import type { CalculatorModel } from './CalculatorTabs';
 
 interface CalculatorResult {
@@ -10,6 +11,8 @@ interface CalculatorResult {
   upside?: number;
   confidence?: 'high' | 'medium' | 'low';
   timestamp?: Date;
+  fromCache?: boolean;
+  cacheAge?: string;
 }
 
 interface CalculatorSummaryProps {
@@ -42,6 +45,11 @@ export const CalculatorSummary: React.FC<CalculatorSummaryProps> = ({
   const maxValue = results.length > 0
     ? Math.max(...results.map(r => r.intrinsicValue))
     : 0;
+  
+  // Find most recent calculation
+  const mostRecentCalculation = results
+    .filter(r => r.timestamp)
+    .sort((a, b) => (b.timestamp!.getTime() - a.timestamp!.getTime()))[0];
   
   const getModelName = (model: CalculatorModel): string => {
     switch(model) {
@@ -90,6 +98,14 @@ export const CalculatorSummary: React.FC<CalculatorSummaryProps> = ({
       <Card>
         <CardHeader>
           <CardTitle>Valuation Summary for {companyName} ({symbol})</CardTitle>
+          {mostRecentCalculation && (
+            <div className="flex items-center space-x-2 text-sm text-gray-600">
+              <Clock className="h-4 w-4" />
+              <span>
+                Last updated {formatRelativeTime(mostRecentCalculation.timestamp!)}
+              </span>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-3 gap-6">
@@ -159,11 +175,25 @@ export const CalculatorSummary: React.FC<CalculatorSummaryProps> = ({
                       <h4 className="font-medium text-gray-900">
                         {getModelName(result.model)}
                       </h4>
-                      {result.confidence && (
-                        <span className={`text-xs ${getConfidenceColor(result.confidence)}`}>
-                          {result.confidence} confidence
-                        </span>
-                      )}
+                      <div className="flex items-center space-x-2 mt-1">
+                        {result.confidence && (
+                          <span className={`text-xs ${getConfidenceColor(result.confidence)}`}>
+                            {result.confidence} confidence
+                          </span>
+                        )}
+                        {result.timestamp && (
+                          <div className="flex items-center space-x-1">
+                            {result.fromCache ? (
+                              <Archive className="h-3 w-3 text-gray-400" />
+                            ) : (
+                              <Clock className="h-3 w-3 text-gray-400" />
+                            )}
+                            <span className={`text-xs ${getTimestampColor(result.timestamp)}`}>
+                              {formatRelativeTime(result.timestamp)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="text-right">
                       <div className="text-xl font-semibold text-gray-900">

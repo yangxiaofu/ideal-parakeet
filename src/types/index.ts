@@ -16,6 +16,18 @@ export interface IncomeStatement {
   netIncome: number;
   eps: number;
   sharesOutstanding: number;
+  
+  // Enhanced fields for MOAT analysis
+  grossProfit?: number;
+  grossMargin?: number; // grossProfit / revenue
+  sellingGeneralAndAdministrative?: number; // SG&A expenses
+  researchAndDevelopment?: number; // R&D expenses
+  operatingExpenses?: number; // Total operating expenses
+  ebitda?: number; // Earnings before interest, taxes, depreciation, amortization
+  ebit?: number; // Earnings before interest and taxes
+  interestExpense?: number; // For WACC calculation
+  incomeTaxExpense?: number; // For NOPAT calculation
+  effectiveTaxRate?: number; // incomeTaxExpense / incomeBeforeTax
 }
 
 export interface BalanceSheet {
@@ -48,18 +60,25 @@ export interface BalanceSheet {
   accruedExpenses?: number;
   shortTermDebt?: number;
   otherCurrentLiabilities?: number;
+  deferredRevenue?: number; // Important for switching costs analysis
   
   // Non-current liabilities
   longTermDebt?: number;
   pensionObligations?: number;
   deferredTaxLiabilities?: number;
   otherNonCurrentLiabilities?: number;
+  deferredRevenueNonCurrent?: number;
   
   // Additional fields for comprehensive analysis
   tangibleBookValue?: number;
   workingCapital?: number;
   netTangibleAssets?: number;
   sharesOutstanding?: number;
+  
+  // ROIC calculation fields
+  investedCapital?: number; // Total Assets - Cash - Current Liabilities + Short-term Debt
+  returnOnAssets?: number; // Net Income / Total Assets
+  returnOnEquity?: number; // Net Income / Total Equity
 }
 
 export interface CashFlowStatement {
