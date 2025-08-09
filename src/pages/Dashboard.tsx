@@ -6,6 +6,7 @@ import { DCFCalculator } from '../components/calculator/DCFCalculator';
 import { DDMCalculator } from '../components/calculator/DDMCalculator';
 import { RelativeValuationCalculator } from '../components/calculator/RelativeValuationCalculator';
 import { NAVCalculator } from '../components/calculator/NAVCalculator';
+import { EPVCalculator } from '../components/calculator/EPVCalculator';
 import { CalculatorTabs, type CalculatorModel } from '../components/calculator/CalculatorTabs';
 import { CalculatorSummary } from '../components/calculator/CalculatorSummary';
 import { FinancialHistoryTable } from '../components/dashboard/FinancialHistoryTable';
@@ -366,10 +367,23 @@ export const Dashboard: React.FC = () => {
                 )}
 
                 {activeTab === 'EPV' && (
-                  <div className="py-12 text-center">
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Earnings Power Value</h3>
-                    <p className="text-sm text-gray-600">Coming soon...</p>
-                  </div>
+                  <EPVCalculator
+                    symbol={companyData.symbol}
+                    currentPrice={getCurrentPrice()}
+                    defaultNormalizedEarnings={financialData.latestNetIncome}
+                    defaultSharesOutstanding={financialData.latestShares}
+                    historicalEarnings={companyData.incomeStatement
+                      .slice(0, 10)
+                      .map(is => ({
+                        year: parseInt(is.date.split('-')[0]),
+                        netIncome: is.netIncome,
+                        operatingIncome: is.operatingIncome,
+                        revenue: is.revenue,
+                        date: is.date
+                      }))
+                      .sort((a, b) => b.year - a.year)}
+                    onCalculationComplete={(result) => handleCalculatorComplete('EPV', result)}
+                  />
                 )}
 
                 {activeTab === 'SUMMARY' && (

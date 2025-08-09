@@ -76,7 +76,7 @@ export const CalculatorTabs: React.FC<CalculatorTabsProps> = ({
       name: 'EPV',
       description: 'Earnings Power',
       icon: <Calculator className="h-4 w-4" />,
-      available: false, // Coming soon
+      available: true, // Now available!
       completed: completedCalculators.has('EPV'),
       result: results.EPV
     },
