@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { TrendingUp, TrendingDown, Info, DollarSign, BarChart3 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line, ComposedChart } from 'recharts';
 import type { DDMResult, DDMSensitivity, DDMInputs } from '../../types/ddm';
 import { calculateDDMSensitivity } from '../../utils/ddmCalculator';
 
@@ -181,7 +181,7 @@ export const DDMResults: React.FC<DDMResultsProps> = ({
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData}>
+            <ComposedChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="year" />
               <YAxis yAxisId="left" orientation="left" />
@@ -191,7 +191,7 @@ export const DDMResults: React.FC<DDMResultsProps> = ({
               <Bar yAxisId="left" dataKey="dividend" fill="#3B82F6" name="Dividend ($)" />
               <Bar yAxisId="left" dataKey="presentValue" fill="#10B981" name="Present Value ($)" />
               <Line yAxisId="right" type="monotone" dataKey="growthRate" stroke="#F59E0B" name="Growth Rate (%)" />
-            </BarChart>
+            </ComposedChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
