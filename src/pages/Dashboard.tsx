@@ -12,13 +12,13 @@ import { CalculatorSummary } from '../components/calculator/CalculatorSummary';
 import { FinancialHistoryTable } from '../components/dashboard/FinancialHistoryTable';
 import { RecommendationBanner } from '../components/dashboard/RecommendationBanner';
 import { MoatAnalysis } from '../components/analysis/MoatAnalysis';
-import { fmpApi } from '../services/fmpApi';
+import { fmpApi, type CompanyBasicInfo } from '../services/fmpApi';
 import { formatCurrency, formatShares, formatEPS, formatYear } from '../utils/formatters';
 import { useFinancialData } from '../hooks/useFinancialData';
 import { useMetricHighlighting } from '../hooks/useMetricHighlighting';
 import { calculateMoatFromFinancials } from '../utils/moatAnalysis';
 import { getMockCompanyData, isDemo } from '../utils/mockData';
-import type { CompanyFinancials } from '../types';
+import type { CompanyFinancials, IncomeStatement, BalanceSheet, CashFlowStatement } from '../types';
 
 // Import debug helpers in development
 if (import.meta.env.DEV) {
@@ -38,11 +38,20 @@ interface CalculatorResultMetadata {
 export const Dashboard: React.FC = () => {
   const [ticker, setTicker] = useState('');
   const [loading, setLoading] = useState(false);
+  const [basicInfo, setBasicInfo] = useState<CompanyBasicInfo | null>(null);
   const [companyData, setCompanyData] = useState<CompanyFinancials | null>(null);
+  const [loadingFinancials, setLoadingFinancials] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<CalculatorModel>('DCF');
   const [completedCalculators, setCompletedCalculators] = useState<Set<CalculatorModel>>(new Set());
   const [calculatorResults, setCalculatorResults] = useState<Partial<Record<CalculatorModel, CalculatorResultMetadata>>>({});
+  
+  // Track which financial statements have been loaded
+  const [loadedStatements, setLoadedStatements] = useState<{
+    income: boolean;
+    balance: boolean;
+    cashFlow: boolean;
+  }>({ income: false, balance: false, cashFlow: false });
   
   // Log when component mounts
   React.useEffect(() => {
@@ -80,10 +89,12 @@ export const Dashboard: React.FC = () => {
     console.log('Starting search for ticker:', ticker);
     setLoading(true);
     setError(null);
+    setBasicInfo(null);
     setCompanyData(null);
     setActiveTab('DCF');
     setCompletedCalculators(new Set());
     setCalculatorResults({});
+    setLoadedStatements({ income: false, balance: false, cashFlow: false });
     
     try {
       // Check if using demo mode
@@ -109,8 +120,17 @@ export const Dashboard: React.FC = () => {
             throw new Error('Mock data returned null');
           }
           
+          // For demo mode, convert to basic info format first, then set full data
+          const demoBasicInfo: CompanyBasicInfo = {
+            symbol: mockData.symbol,
+            name: mockData.name,
+            currentPrice: mockData.currentPrice || 0,
+            sharesOutstanding: mockData.sharesOutstanding || 0
+          };
+          setBasicInfo(demoBasicInfo);
           setCompanyData(mockData);
-          console.log('Company data set - resetting loading state');
+          setLoadedStatements({ income: true, balance: true, cashFlow: true });
+          console.log('Demo data set - resetting loading state');
           setLoading(false);  // Reset loading state for demo mode
           console.log('Demo mode complete - returning');
           return;
@@ -122,10 +142,10 @@ export const Dashboard: React.FC = () => {
         }
       }
       
-      console.log('Calling FMP API for ticker:', ticker.trim());
-      const data = await fmpApi.getCompanyFinancials(ticker.trim());
-      console.log('Successfully fetched data:', data);
-      setCompanyData(data);
+      console.log('Calling FMP API for basic info:', ticker.trim());
+      const data = await fmpApi.getCompanyBasicInfo(ticker.trim());
+      console.log('Successfully fetched basic info:', data);
+      setBasicInfo(data);
     } catch (error: unknown) {
       console.error('Search failed with error:', error);
       
@@ -154,8 +174,105 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  const handleTabChange = (tab: CalculatorModel) => {
+
+  // Load specific financial statements for individual calculators
+  const loadSpecificStatements = async (calculator: CalculatorModel) => {
+    if (!basicInfo || loadingFinancials) {
+      return;
+    }
+
+    // Determine what statements are needed for each calculator
+    const getRequiredStatements = (calc: CalculatorModel): ('income' | 'balance' | 'cashFlow')[] => {
+      switch (calc) {
+        case 'DCF':
+          return ['cashFlow', 'income']; // DCF needs cash flow for FCF, income for shares
+        case 'DDM':
+          return ['cashFlow', 'income']; // DDM needs cash flow for dividends, income for shares  
+        case 'NAV':
+          return ['balance']; // NAV only needs balance sheet
+        case 'EPV':
+          return ['income']; // EPV only needs income statement
+        default:
+          return [];
+      }
+    };
+
+    const requiredStatements = getRequiredStatements(calculator);
+    const statementsToLoad = requiredStatements.filter(statement => !loadedStatements[statement]);
+    
+    if (statementsToLoad.length === 0) {
+      return; // All required statements already loaded
+    }
+
+    setLoadingFinancials(true);
+    try {
+      console.log(`Loading ${statementsToLoad.join(', ')} statements for ${calculator} calculator`);
+      
+      const loadPromises: Promise<unknown>[] = [];
+      const statementTypes: ('income' | 'balance' | 'cashFlow')[] = [];
+
+      statementsToLoad.forEach(statementType => {
+        if (statementType === 'income') {
+          loadPromises.push(fmpApi.getIncomeStatementProcessed(basicInfo.symbol));
+          statementTypes.push('income');
+        } else if (statementType === 'balance') {
+          loadPromises.push(fmpApi.getBalanceSheetProcessed(basicInfo.symbol));
+          statementTypes.push('balance');
+        } else if (statementType === 'cashFlow') {
+          loadPromises.push(fmpApi.getCashFlowStatementProcessed(basicInfo.symbol));
+          statementTypes.push('cashFlow');
+        }
+      });
+
+      const loadedData = await Promise.all(loadPromises);
+      
+      // Create or update company data with the new statements
+      const currentData = companyData || {
+        symbol: basicInfo.symbol,
+        name: basicInfo.name,
+        currentPrice: basicInfo.currentPrice,
+        sharesOutstanding: basicInfo.sharesOutstanding,
+        incomeStatement: [],
+        balanceSheet: [],
+        cashFlowStatement: []
+      };
+
+      const updatedData: CompanyFinancials = { ...currentData };
+      const updatedLoadedStatements = { ...loadedStatements };
+
+      loadedData.forEach((data, index) => {
+        const statementType = statementTypes[index];
+        if (statementType === 'income') {
+          updatedData.incomeStatement = data as IncomeStatement[];
+          updatedLoadedStatements.income = true;
+        } else if (statementType === 'balance') {
+          updatedData.balanceSheet = data as BalanceSheet[];
+          updatedLoadedStatements.balance = true;
+        } else if (statementType === 'cashFlow') {
+          updatedData.cashFlowStatement = data as CashFlowStatement[];
+          updatedLoadedStatements.cashFlow = true;
+        }
+      });
+
+      setCompanyData(updatedData);
+      setLoadedStatements(updatedLoadedStatements);
+      console.log(`Loaded ${statementsToLoad.length} statements for ${calculator} - API calls: ${statementsToLoad.length}`);
+    } catch (error) {
+      console.error('Failed to load specific financial statements:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load financial data');
+    } finally {
+      setLoadingFinancials(false);
+    }
+  };
+
+  const handleTabChange = async (tab: CalculatorModel) => {
     setActiveTab(tab);
+    
+    // Load specific financial data for the calculator if needed
+    const needsFinancialData = ['DCF', 'DDM', 'NAV', 'EPV'].includes(tab);
+    if (needsFinancialData && basicInfo) {
+      await loadSpecificStatements(tab);
+    }
   };
 
   const handleCalculatorComplete = (
@@ -181,7 +298,7 @@ export const Dashboard: React.FC = () => {
   };
 
   const getCurrentPrice = (): number | undefined => {
-    return companyData?.currentPrice;
+    return companyData?.currentPrice || basicInfo?.currentPrice;
   };
 
   return (
@@ -293,7 +410,7 @@ export const Dashboard: React.FC = () => {
           )}
 
           {/* Company Data Display - Minimal */}
-          {companyData && (
+          {(companyData || basicInfo) && (
             <div className="space-y-8">
               {/* Company Header - Minimal */}
               <div className="minimal-card">
@@ -301,22 +418,22 @@ export const Dashboard: React.FC = () => {
                   <div className="flex items-center space-x-4">
                     <div className="w-14 h-14 bg-gradient-to-br from-gray-700 to-gray-900 rounded-2xl flex items-center justify-center">
                       <span className="text-white font-semibold text-lg">
-                        {companyData.symbol.substring(0, 2)}
+                        {(companyData?.symbol || basicInfo?.symbol || '').substring(0, 2)}
                       </span>
                     </div>
                     <div>
                       <h2 className="text-2xl font-semibold text-gray-800">
-                        {companyData.name}
+                        {companyData?.name || basicInfo?.name}
                       </h2>
                       <p className="text-sm text-gray-500">
-                        {companyData.symbol}
+                        {companyData?.symbol || basicInfo?.symbol}
                       </p>
                     </div>
                   </div>
-                  {companyData.currentPrice && (
+                  {getCurrentPrice() && (
                     <div className="text-right">
                       <div className="text-2xl font-semibold text-gray-800">
-                        ${companyData.currentPrice.toFixed(2)}
+                        ${getCurrentPrice()!.toFixed(2)}
                       </div>
                       <div className="text-xs text-gray-400">Current Price</div>
                     </div>
@@ -324,8 +441,19 @@ export const Dashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Financial Metrics - Minimal Grid */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
+              {/* Loading indicator for financial data */}
+              {loadingFinancials && (
+                <div className="minimal-card">
+                  <div className="text-center py-6">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+                    <p className="text-sm text-gray-600">Loading detailed financial data...</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Financial Metrics - Minimal Grid - Only show when full financial data is loaded */}
+              {companyData && (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
                 {/* Income Statement Card */}
                 <div className="bg-white rounded-2xl p-5 border border-gray-100">
                   <div className="flex items-center mb-4">
@@ -407,41 +535,48 @@ export const Dashboard: React.FC = () => {
                     )}
                   </div>
                 </div>
-              </div>
+                </div>
+              )}
 
-              {/* Competitive MOAT Analysis */}
-              <MoatAnalysis 
-                analysis={calculateMoatFromFinancials(companyData)}
-                companySymbol={companyData.symbol}
-                className="mt-8"
-              />
+              {/* Competitive MOAT Analysis - Only show when full financial data is loaded */}
+              {companyData && (
+                <MoatAnalysis 
+                  analysis={calculateMoatFromFinancials(companyData)}
+                  companySymbol={companyData.symbol}
+                  className="mt-8"
+                />
+              )}
 
-              {/* Financial History Table */}
-              <FinancialHistoryTable
-                incomeStatements={financialData.sortedIncomeStatements}
-                balanceSheets={financialData.sortedBalanceSheets}
-                cashFlowStatements={financialData.sortedCashFlowStatements}
-                highlightedMetrics={highlightedMetrics}
-                hasDividends={financialData.hasDividends}
-              />
+              {/* Financial History Table - Only show when full financial data is loaded */}
+              {companyData && (
+                <FinancialHistoryTable
+                  incomeStatements={financialData.sortedIncomeStatements}
+                  balanceSheets={financialData.sortedBalanceSheets}
+                  cashFlowStatements={financialData.sortedCashFlowStatements}
+                  highlightedMetrics={highlightedMetrics}
+                  hasDividends={financialData.hasDividends}
+                />
+              )}
             </div>
           )}
 
-          {/* Calculator Section with Tabs */}
-          {companyData && (
+          {/* Calculator Section with Tabs - Show when we have basic info or full data */}
+          {(companyData || basicInfo) && (
             <div className="space-y-6">
-              {/* Recommendation Banner */}
-              <RecommendationBanner
-                companyData={companyData}
-                latestFCF={financialData.latestFCF}
-                latestDividend={financialData.latestDividend}
-                latestNetIncome={financialData.latestNetIncome}
-                latestTotalAssets={financialData.latestTotalAssets}
-                latestTotalEquity={financialData.latestTotalEquity}
-                latestIncomeStatement={(financialData.latestIncomeStatement as unknown as Record<string, unknown>) || {}}
-                latestBalanceSheet={(financialData.latestBalanceSheet as unknown as Record<string, unknown>) || {}}
-                latestCashFlowStatement={(financialData.latestCashFlowStatement as unknown as Record<string, unknown>) || {}}
-              />
+              {/* Recommendation Banner - Only show when full financial data is loaded */}
+              {companyData && (
+                <RecommendationBanner
+                  companyData={companyData}
+                  latestFCF={financialData.latestFCF}
+                  latestDividend={financialData.latestDividend}
+                  latestNetIncome={financialData.latestNetIncome}
+                  latestTotalAssets={financialData.latestTotalAssets}
+                  latestTotalEquity={financialData.latestTotalEquity}
+                  latestIncomeStatement={(financialData.latestIncomeStatement as unknown as Record<string, unknown>) || {}}
+                  latestBalanceSheet={(financialData.latestBalanceSheet as unknown as Record<string, unknown>) || {}}
+                  latestCashFlowStatement={(financialData.latestCashFlowStatement as unknown as Record<string, unknown>) || {}}
+                />
+              )}
               
               {/* Calculator Tabs */}
               <CalculatorTabs
@@ -449,49 +584,95 @@ export const Dashboard: React.FC = () => {
                 onTabChange={handleTabChange}
                 completedCalculators={completedCalculators}
                 results={calculatorResults}
-                companyData={{
+                companyData={companyData ? {
                   balanceSheet: companyData.balanceSheet,
                   incomeStatement: companyData.incomeStatement,
                   cashFlowStatement: companyData.cashFlowStatement
-                }}
+                } : undefined}
               />
 
               {/* Calculator Content */}
               <div className="minimal-card">
                 {activeTab === 'DCF' && (
-                  <DCFCalculator 
-                    symbol={companyData.symbol}
-                    currentPrice={getCurrentPrice()}
-                    defaultBaseFCF={financialData.latestFCF}
-                    defaultSharesOutstanding={financialData.latestShares}
-                    historicalFCF={financialData.historicalFCF}
-                    historicalShares={financialData.historicalShares}
-                    onCalculationComplete={(result) => handleCalculatorComplete('DCF', result)}
-                  />
+                  (companyData && loadedStatements.cashFlow && loadedStatements.income) ? (
+                    <DCFCalculator 
+                      symbol={companyData.symbol}
+                      currentPrice={getCurrentPrice()}
+                      defaultBaseFCF={financialData.latestFCF}
+                      defaultSharesOutstanding={financialData.latestShares}
+                      historicalFCF={financialData.historicalFCF}
+                      historicalShares={financialData.historicalShares}
+                      onCalculationComplete={(result) => handleCalculatorComplete('DCF', result)}
+                    />
+                  ) : (
+                    <div className="text-center py-12">
+                      {loadingFinancials ? (
+                        <div>
+                          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+                          <h3 className="text-lg font-semibold mb-2">Loading Financial Data</h3>
+                          <p className="text-sm text-gray-600">Fetching detailed financial data for DCF analysis...</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-2">Click to Load DCF Calculator</h3>
+                          <p className="text-sm text-gray-600 mb-4">DCF needs cash flow and income statements</p>
+                          <button
+                            onClick={() => loadSpecificStatements('DCF')}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                          >
+                            Load DCF Data (2 API calls)
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
                 )}
 
                 {activeTab === 'DDM' && (
-                  <DDMCalculator
-                    symbol={companyData.symbol}
-                    currentPrice={getCurrentPrice()}
-                    defaultDividend={financialData.latestDividend}
-                    defaultSharesOutstanding={financialData.latestShares}
-                    historicalDividends={companyData.cashFlowStatement
-                      .slice(0, 5)
-                      .map(cf => ({
-                        year: formatYear(cf.date),
-                        value: Math.abs(cf.dividendsPaid || 0) / (companyData.incomeStatement.find(
-                          is => is.date === cf.date
-                        )?.sharesOutstanding || 1)
-                      }))
-                      .filter(d => d.value > 0)
-                      .sort((a, b) => parseInt(b.year) - parseInt(a.year))}
-                    historicalShares={financialData.historicalShares}
-                    onCalculationComplete={(result) => handleCalculatorComplete('DDM', result)}
-                  />
+                  (companyData && loadedStatements.cashFlow && loadedStatements.income) ? (
+                    <DDMCalculator
+                      symbol={companyData.symbol}
+                      currentPrice={getCurrentPrice()}
+                      defaultDividend={financialData.latestDividend}
+                      defaultSharesOutstanding={financialData.latestShares}
+                      historicalDividends={companyData.cashFlowStatement
+                        .slice(0, 5)
+                        .map(cf => ({
+                          year: formatYear(cf.date),
+                          value: Math.abs(cf.dividendsPaid || 0) / (companyData.incomeStatement.find(
+                            is => is.date === cf.date
+                          )?.sharesOutstanding || 1)
+                        }))
+                        .filter(d => d.value > 0)
+                        .sort((a, b) => parseInt(b.year) - parseInt(a.year))}
+                      historicalShares={financialData.historicalShares}
+                      onCalculationComplete={(result) => handleCalculatorComplete('DDM', result)}
+                    />
+                  ) : (
+                    <div className="text-center py-12">
+                      {loadingFinancials ? (
+                        <div>
+                          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+                          <h3 className="text-lg font-semibold mb-2">Loading Financial Data</h3>
+                          <p className="text-sm text-gray-600">Fetching detailed financial data for DDM analysis...</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-2">Click to Load DDM Calculator</h3>
+                          <p className="text-sm text-gray-600 mb-4">DDM needs cash flow and income statements</p>
+                          <button
+                            onClick={() => loadSpecificStatements('DDM')}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                          >
+                            Load DDM Data (2 API calls)
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
                 )}
 
-                {activeTab === 'RELATIVE' && (
+                {activeTab === 'RELATIVE' && companyData && (
                   <RelativeValuationCalculator
                     symbol={companyData.symbol}
                     currentPrice={getCurrentPrice()}
@@ -513,39 +694,85 @@ export const Dashboard: React.FC = () => {
                 )}
 
                 {activeTab === 'NAV' && (
-                  <NAVCalculator
-                    symbol={companyData.symbol}
-                    currentPrice={getCurrentPrice()}
-                    balanceSheet={financialData.latestBalanceSheet || undefined}
-                    sharesOutstanding={companyData.sharesOutstanding}
-                    onCalculationComplete={(result) => handleCalculatorComplete('NAV', result)}
-                  />
+                  (companyData && loadedStatements.balance) ? (
+                    <NAVCalculator
+                      symbol={companyData.symbol}
+                      currentPrice={getCurrentPrice()}
+                      balanceSheet={financialData.latestBalanceSheet || undefined}
+                      sharesOutstanding={companyData.sharesOutstanding}
+                      onCalculationComplete={(result) => handleCalculatorComplete('NAV', result)}
+                    />
+                  ) : (
+                    <div className="text-center py-12">
+                      {loadingFinancials ? (
+                        <div>
+                          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+                          <h3 className="text-lg font-semibold mb-2">Loading Financial Data</h3>
+                          <p className="text-sm text-gray-600">Fetching detailed financial data for NAV analysis...</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-2">Click to Load NAV Calculator</h3>
+                          <p className="text-sm text-gray-600 mb-4">NAV only needs balance sheet data</p>
+                          <button
+                            onClick={() => loadSpecificStatements('NAV')}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                          >
+                            Load NAV Data (1 API call)
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
                 )}
 
                 {activeTab === 'EPV' && (
-                  <EPVCalculator
-                    symbol={companyData.symbol}
-                    currentPrice={getCurrentPrice()}
-                    defaultNormalizedEarnings={financialData.latestNetIncome}
-                    defaultSharesOutstanding={financialData.latestShares}
-                    historicalEarnings={companyData.incomeStatement
-                      .slice(0, 10)
-                      .map(is => ({
-                        year: parseInt(is.date.split('-')[0]),
-                        netIncome: is.netIncome,
-                        operatingIncome: is.operatingIncome,
-                        revenue: is.revenue,
-                        date: is.date
-                      }))
-                      .sort((a, b) => b.year - a.year)}
-                    onCalculationComplete={(result) => handleCalculatorComplete('EPV', result)}
-                  />
+                  (companyData && loadedStatements.income) ? (
+                    <EPVCalculator
+                      symbol={companyData.symbol}
+                      currentPrice={getCurrentPrice()}
+                      defaultNormalizedEarnings={financialData.latestNetIncome}
+                      defaultSharesOutstanding={financialData.latestShares}
+                      historicalEarnings={companyData.incomeStatement
+                        .slice(0, 10)
+                        .map(is => ({
+                          year: parseInt(is.date.split('-')[0]),
+                          netIncome: is.netIncome,
+                          operatingIncome: is.operatingIncome,
+                          revenue: is.revenue,
+                          date: is.date
+                        }))
+                        .sort((a, b) => b.year - a.year)}
+                      onCalculationComplete={(result) => handleCalculatorComplete('EPV', result)}
+                    />
+                  ) : (
+                    <div className="text-center py-12">
+                      {loadingFinancials ? (
+                        <div>
+                          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+                          <h3 className="text-lg font-semibold mb-2">Loading Financial Data</h3>
+                          <p className="text-sm text-gray-600">Fetching detailed financial data for EPV analysis...</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-2">Click to Load EPV Calculator</h3>
+                          <p className="text-sm text-gray-600 mb-4">EPV only needs income statement data</p>
+                          <button
+                            onClick={() => loadSpecificStatements('EPV')}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                          >
+                            Load EPV Data (1 API call)
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
                 )}
 
                 {activeTab === 'SUMMARY' && (
                   <CalculatorSummary
-                    symbol={companyData.symbol}
-                    companyName={companyData.name}
+                    symbol={(companyData?.symbol || basicInfo?.symbol || '')}
+                    companyName={(companyData?.name || basicInfo?.name || '')}
                     currentPrice={getCurrentPrice()}
                     results={Object.entries(calculatorResults).map(([model, metadata]) => ({
                       model: model as CalculatorModel,

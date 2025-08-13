@@ -67,7 +67,7 @@ export const CalculatorTabs: React.FC<CalculatorTabsProps> = ({
       name: 'Relative',
       description: 'Peer Multiples',
       icon: <BarChart3 className="h-4 w-4" />,
-      available: true, // Now available!
+      available: false, // Deactivated - reduces API calls
       completed: completedCalculators.has('RELATIVE'),
       result: results.RELATIVE?.value
     },

@@ -1,5 +1,13 @@
 import type { CompanyFinancials, IncomeStatement, BalanceSheet, CashFlowStatement } from '../types';
 
+// Basic company info for minimal initial load
+export interface CompanyBasicInfo {
+  symbol: string;
+  name: string;
+  currentPrice: number;
+  sharesOutstanding: number;
+}
+
 // FMP API response types
 interface FMPSearchResult {
   symbol: string;
@@ -348,6 +356,86 @@ class FMPApiService {
         throw error;
       }
       throw new FMPApiError('Failed to fetch company financials');
+    }
+  }
+
+  async getCompanyBasicInfo(symbol: string): Promise<CompanyBasicInfo> {
+    try {
+      const profile = await this.getCompanyProfile(symbol);
+      
+      return {
+        symbol: profile.symbol,
+        name: profile.name,
+        currentPrice: profile.price,
+        sharesOutstanding: profile.sharesOutstanding
+      };
+    } catch (error) {
+      if (error instanceof FMPApiError) {
+        throw error;
+      }
+      throw new FMPApiError('Failed to fetch company basic info');
+    }
+  }
+
+  async getFinancialStatementsOnly(symbol: string): Promise<{
+    incomeStatement: IncomeStatement[];
+    balanceSheet: BalanceSheet[];
+    cashFlowStatement: CashFlowStatement[];
+  }> {
+    try {
+      const [incomeStatement, balanceSheet, cashFlowStatement] = await Promise.all([
+        this.getIncomeStatement(symbol),
+        this.getBalanceSheet(symbol),
+        this.getCashFlowStatement(symbol)
+      ]);
+
+      return {
+        incomeStatement: incomeStatement.reverse(), // Most recent first
+        balanceSheet: balanceSheet.reverse(),
+        cashFlowStatement: cashFlowStatement.reverse()
+      };
+    } catch (error) {
+      if (error instanceof FMPApiError) {
+        throw error;
+      }
+      throw new FMPApiError('Failed to fetch financial statements');
+    }
+  }
+
+  // Methods for loading individual financial statements
+  async getIncomeStatementProcessed(symbol: string): Promise<IncomeStatement[]> {
+    try {
+      const incomeStatement = await this.getIncomeStatement(symbol);
+      return incomeStatement.reverse(); // Most recent first
+    } catch (error) {
+      if (error instanceof FMPApiError) {
+        throw error;
+      }
+      throw new FMPApiError('Failed to fetch income statement');
+    }
+  }
+
+  async getBalanceSheetProcessed(symbol: string): Promise<BalanceSheet[]> {
+    try {
+      const balanceSheet = await this.getBalanceSheet(symbol);
+      return balanceSheet.reverse(); // Most recent first
+    } catch (error) {
+      if (error instanceof FMPApiError) {
+        throw error;
+      }
+      throw new FMPApiError('Failed to fetch balance sheet');
+    }
+  }
+
+  async getCashFlowStatementProcessed(symbol: string): Promise<CashFlowStatement[]> {
+    try {
+      const cashFlowStatement = await this.getCashFlowStatement(symbol);
+      return cashFlowStatement.reverse(); // Most recent first
+    } catch (error) {
+      if (error instanceof FMPApiError) {
+        throw error;
+      }
+      throw new FMPApiError('Failed to fetch cash flow statement');
     }
   }
 
