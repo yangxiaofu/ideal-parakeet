@@ -10,7 +10,7 @@
  */
 
 import type { MoatAnalysis } from '../types/epv';
-import type { CompanyFinancials, IncomeStatement, BalanceSheet } from '../types';
+import type { CompanyFinancials, IncomeStatement } from '../types';
 import { analyzeROIC, getDefaultWACCInputs, type ROICAnalysis } from './roicCalculator';
 
 export interface MoatAnalysisInputs {

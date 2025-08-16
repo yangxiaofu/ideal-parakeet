@@ -265,7 +265,7 @@ export function analyzeROIC(
  * This is a simplified version - in production, would fetch real-time data
  */
 export function getDefaultWACCInputs(
-  industry?: string,
+  _industry?: string,
   currentDebtToEquity?: number
 ): WACCInputs {
   // Default values as of 2024

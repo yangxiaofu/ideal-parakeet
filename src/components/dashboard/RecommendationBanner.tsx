@@ -1,7 +1,7 @@
 import React from 'react';
 import { formatCurrency } from '../../utils/formatters';
 import { getRecommendedCalculators } from '../../constants/calculatorInfo';
-import type { CompanyFinancials } from '../../types';
+import type { CompanyFinancials, IncomeStatement, BalanceSheet, CashFlowStatement } from '../../types';
 
 interface RecommendationBannerProps {
   companyData: CompanyFinancials;
@@ -10,9 +10,9 @@ interface RecommendationBannerProps {
   latestNetIncome: number;
   latestTotalAssets: number;
   latestTotalEquity: number;
-  latestIncomeStatement: Record<string, unknown>;
-  latestBalanceSheet: Record<string, unknown>;
-  latestCashFlowStatement: Record<string, unknown>;
+  latestIncomeStatement: IncomeStatement;
+  latestBalanceSheet: BalanceSheet;
+  latestCashFlowStatement: CashFlowStatement;
 }
 
 export const RecommendationBanner: React.FC<RecommendationBannerProps> = ({

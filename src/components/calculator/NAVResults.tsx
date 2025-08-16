@@ -549,12 +549,12 @@ export const NAVResults: React.FC<NAVResultsProps> = ({ result, currentPrice }) 
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, value }) => `${name}: $${(value / 1_000_000).toFixed(1)}M`}
+                    label={({ name, value }) => `${name}: $${((value || 0) / 1_000_000).toFixed(1)}M`}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {assetQualityData.map((entry, index) => (
+                    {assetQualityData.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>

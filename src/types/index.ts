@@ -28,6 +28,9 @@ export interface IncomeStatement {
   interestExpense?: number; // For WACC calculation
   incomeTaxExpense?: number; // For NOPAT calculation
   effectiveTaxRate?: number; // incomeTaxExpense / incomeBeforeTax
+  
+  // Index signature for compatibility with Record<string, unknown>
+  [key: string]: unknown;
 }
 
 export interface BalanceSheet {
@@ -87,6 +90,9 @@ export interface CashFlowStatement {
   capitalExpenditure: number;
   freeCashFlow: number;
   dividendsPaid: number;
+  
+  // Index signature for compatibility with Record<string, unknown>
+  [key: string]: unknown;
 }
 
 // Valuation Types
