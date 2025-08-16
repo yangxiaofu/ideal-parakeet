@@ -18,7 +18,8 @@ import { useFinancialData } from '../hooks/useFinancialData';
 import { useMetricHighlighting } from '../hooks/useMetricHighlighting';
 import { calculateMoatFromFinancials } from '../utils/moatAnalysis';
 import { getMockCompanyData, isDemo } from '../utils/mockData';
-import type { CompanyFinancials, IncomeStatement, BalanceSheet, CashFlowStatement } from '../types';
+import { PeerDataCache } from '../utils/peerDataCache';
+import type { CompanyFinancials } from '../types';
 
 // Import debug helpers in development
 if (import.meta.env.DEV) {
@@ -142,10 +143,52 @@ export const Dashboard: React.FC = () => {
         }
       }
       
-      console.log('Calling FMP API for basic info:', ticker.trim());
-      const data = await fmpApi.getCompanyBasicInfo(ticker.trim());
-      console.log('Successfully fetched basic info:', data);
-      setBasicInfo(data);
+      // Check cache first
+      const tickerUpper = ticker.trim().toUpperCase();
+      console.log(`Checking cache for ticker: ${tickerUpper}`);
+      const cachedData = PeerDataCache.getCachedCompanyData(tickerUpper);
+      
+      if (cachedData) {
+        console.log('Cache HIT - using cached data, 0 API calls');
+        setBasicInfo({
+          symbol: cachedData.symbol,
+          name: cachedData.name,
+          currentPrice: cachedData.currentPrice || 0,
+          sharesOutstanding: cachedData.sharesOutstanding || 0
+        });
+        setCompanyData(cachedData);
+        setLoadedStatements({ income: true, balance: true, cashFlow: true });
+        return;
+      }
+
+      // Cache miss - fetch from API
+      console.log('Cache MISS - fetching all financial data from API');
+      setLoadingFinancials(true);
+      try {
+        // Use single API method that fetches everything efficiently
+        const fullCompanyData = await fmpApi.getCompanyFinancials(tickerUpper);
+        console.log('Successfully fetched all company data - API calls: 4');
+
+        // Cache the result for future use (5-minute TTL for frequently searched stocks)
+        PeerDataCache.setCachedCompanyData(tickerUpper, fullCompanyData, 5 * 60 * 1000);
+
+        // Set basic info
+        setBasicInfo({
+          symbol: fullCompanyData.symbol,
+          name: fullCompanyData.name,
+          currentPrice: fullCompanyData.currentPrice || 0,
+          sharesOutstanding: fullCompanyData.sharesOutstanding || 0
+        });
+
+        // Set full company data
+        setCompanyData(fullCompanyData);
+        setLoadedStatements({ income: true, balance: true, cashFlow: true });
+      } catch (financialError) {
+        console.error('Failed to load financial data:', financialError);
+        setError(financialError instanceof Error ? financialError.message : 'Failed to load financial data');
+      } finally {
+        setLoadingFinancials(false);
+      }
     } catch (error: unknown) {
       console.error('Search failed with error:', error);
       
@@ -175,104 +218,10 @@ export const Dashboard: React.FC = () => {
   };
 
 
-  // Load specific financial statements for individual calculators
-  const loadSpecificStatements = async (calculator: CalculatorModel) => {
-    if (!basicInfo || loadingFinancials) {
-      return;
-    }
 
-    // Determine what statements are needed for each calculator
-    const getRequiredStatements = (calc: CalculatorModel): ('income' | 'balance' | 'cashFlow')[] => {
-      switch (calc) {
-        case 'DCF':
-          return ['cashFlow', 'income']; // DCF needs cash flow for FCF, income for shares
-        case 'DDM':
-          return ['cashFlow', 'income']; // DDM needs cash flow for dividends, income for shares  
-        case 'NAV':
-          return ['balance']; // NAV only needs balance sheet
-        case 'EPV':
-          return ['income']; // EPV only needs income statement
-        default:
-          return [];
-      }
-    };
-
-    const requiredStatements = getRequiredStatements(calculator);
-    const statementsToLoad = requiredStatements.filter(statement => !loadedStatements[statement]);
-    
-    if (statementsToLoad.length === 0) {
-      return; // All required statements already loaded
-    }
-
-    setLoadingFinancials(true);
-    try {
-      console.log(`Loading ${statementsToLoad.join(', ')} statements for ${calculator} calculator`);
-      
-      const loadPromises: Promise<unknown>[] = [];
-      const statementTypes: ('income' | 'balance' | 'cashFlow')[] = [];
-
-      statementsToLoad.forEach(statementType => {
-        if (statementType === 'income') {
-          loadPromises.push(fmpApi.getIncomeStatementProcessed(basicInfo.symbol));
-          statementTypes.push('income');
-        } else if (statementType === 'balance') {
-          loadPromises.push(fmpApi.getBalanceSheetProcessed(basicInfo.symbol));
-          statementTypes.push('balance');
-        } else if (statementType === 'cashFlow') {
-          loadPromises.push(fmpApi.getCashFlowStatementProcessed(basicInfo.symbol));
-          statementTypes.push('cashFlow');
-        }
-      });
-
-      const loadedData = await Promise.all(loadPromises);
-      
-      // Create or update company data with the new statements
-      const currentData = companyData || {
-        symbol: basicInfo.symbol,
-        name: basicInfo.name,
-        currentPrice: basicInfo.currentPrice,
-        sharesOutstanding: basicInfo.sharesOutstanding,
-        incomeStatement: [],
-        balanceSheet: [],
-        cashFlowStatement: []
-      };
-
-      const updatedData: CompanyFinancials = { ...currentData };
-      const updatedLoadedStatements = { ...loadedStatements };
-
-      loadedData.forEach((data, index) => {
-        const statementType = statementTypes[index];
-        if (statementType === 'income') {
-          updatedData.incomeStatement = data as IncomeStatement[];
-          updatedLoadedStatements.income = true;
-        } else if (statementType === 'balance') {
-          updatedData.balanceSheet = data as BalanceSheet[];
-          updatedLoadedStatements.balance = true;
-        } else if (statementType === 'cashFlow') {
-          updatedData.cashFlowStatement = data as CashFlowStatement[];
-          updatedLoadedStatements.cashFlow = true;
-        }
-      });
-
-      setCompanyData(updatedData);
-      setLoadedStatements(updatedLoadedStatements);
-      console.log(`Loaded ${statementsToLoad.length} statements for ${calculator} - API calls: ${statementsToLoad.length}`);
-    } catch (error) {
-      console.error('Failed to load specific financial statements:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load financial data');
-    } finally {
-      setLoadingFinancials(false);
-    }
-  };
-
-  const handleTabChange = async (tab: CalculatorModel) => {
+  const handleTabChange = (tab: CalculatorModel) => {
     setActiveTab(tab);
-    
-    // Load specific financial data for the calculator if needed
-    const needsFinancialData = ['DCF', 'DDM', 'NAV', 'EPV'].includes(tab);
-    if (needsFinancialData && basicInfo) {
-      await loadSpecificStatements(tab);
-    }
+    // No need to load financial data - all data is loaded upfront during initial search
   };
 
   const handleCalculatorComplete = (
@@ -349,13 +298,13 @@ export const Dashboard: React.FC = () => {
                   disabled={loading || !ticker.trim()}
                   className="w-full py-4 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-2xl transition-all duration-200 disabled:bg-gray-200 disabled:text-gray-500"
                 >
-                  {loading ? (
+                  {loading || loadingFinancials ? (
                     <div className="flex items-center justify-center space-x-2">
                       <svg className="animate-spin h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      <span>Fetching Financial Data...</span>
+                      <span>{loadingFinancials ? 'Loading Financial Data...' : 'Analyzing...'}</span>
                     </div>
                   ) : (
                     'Analyze Company'
@@ -441,15 +390,6 @@ export const Dashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Loading indicator for financial data */}
-              {loadingFinancials && (
-                <div className="minimal-card">
-                  <div className="text-center py-6">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-                    <p className="text-sm text-gray-600">Loading detailed financial data...</p>
-                  </div>
-                </div>
-              )}
 
               {/* Financial Metrics - Minimal Grid - Only show when full financial data is loaded */}
               {companyData && (
@@ -606,24 +546,10 @@ export const Dashboard: React.FC = () => {
                     />
                   ) : (
                     <div className="text-center py-12">
-                      {loadingFinancials ? (
-                        <div>
-                          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-                          <h3 className="text-lg font-semibold mb-2">Loading Financial Data</h3>
-                          <p className="text-sm text-gray-600">Fetching detailed financial data for DCF analysis...</p>
-                        </div>
-                      ) : (
-                        <div>
-                          <h3 className="text-lg font-semibold mb-2">Click to Load DCF Calculator</h3>
-                          <p className="text-sm text-gray-600 mb-4">DCF needs cash flow and income statements</p>
-                          <button
-                            onClick={() => loadSpecificStatements('DCF')}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                          >
-                            Load DCF Data (2 API calls)
-                          </button>
-                        </div>
-                      )}
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2">Financial Data Required</h3>
+                        <p className="text-sm text-gray-600 mb-4">Please search for a company first to load financial data for DCF analysis</p>
+                      </div>
                     </div>
                   )
                 )}
@@ -650,24 +576,10 @@ export const Dashboard: React.FC = () => {
                     />
                   ) : (
                     <div className="text-center py-12">
-                      {loadingFinancials ? (
-                        <div>
-                          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-                          <h3 className="text-lg font-semibold mb-2">Loading Financial Data</h3>
-                          <p className="text-sm text-gray-600">Fetching detailed financial data for DDM analysis...</p>
-                        </div>
-                      ) : (
-                        <div>
-                          <h3 className="text-lg font-semibold mb-2">Click to Load DDM Calculator</h3>
-                          <p className="text-sm text-gray-600 mb-4">DDM needs cash flow and income statements</p>
-                          <button
-                            onClick={() => loadSpecificStatements('DDM')}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                          >
-                            Load DDM Data (2 API calls)
-                          </button>
-                        </div>
-                      )}
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2">Financial Data Required</h3>
+                        <p className="text-sm text-gray-600 mb-4">Please search for a company first to load financial data for DDM analysis</p>
+                      </div>
                     </div>
                   )
                 )}
@@ -704,24 +616,10 @@ export const Dashboard: React.FC = () => {
                     />
                   ) : (
                     <div className="text-center py-12">
-                      {loadingFinancials ? (
-                        <div>
-                          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-                          <h3 className="text-lg font-semibold mb-2">Loading Financial Data</h3>
-                          <p className="text-sm text-gray-600">Fetching detailed financial data for NAV analysis...</p>
-                        </div>
-                      ) : (
-                        <div>
-                          <h3 className="text-lg font-semibold mb-2">Click to Load NAV Calculator</h3>
-                          <p className="text-sm text-gray-600 mb-4">NAV only needs balance sheet data</p>
-                          <button
-                            onClick={() => loadSpecificStatements('NAV')}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                          >
-                            Load NAV Data (1 API call)
-                          </button>
-                        </div>
-                      )}
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2">Financial Data Required</h3>
+                        <p className="text-sm text-gray-600 mb-4">Please search for a company first to load financial data for NAV analysis</p>
+                      </div>
                     </div>
                   )
                 )}
@@ -747,24 +645,10 @@ export const Dashboard: React.FC = () => {
                     />
                   ) : (
                     <div className="text-center py-12">
-                      {loadingFinancials ? (
-                        <div>
-                          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-                          <h3 className="text-lg font-semibold mb-2">Loading Financial Data</h3>
-                          <p className="text-sm text-gray-600">Fetching detailed financial data for EPV analysis...</p>
-                        </div>
-                      ) : (
-                        <div>
-                          <h3 className="text-lg font-semibold mb-2">Click to Load EPV Calculator</h3>
-                          <p className="text-sm text-gray-600 mb-4">EPV only needs income statement data</p>
-                          <button
-                            onClick={() => loadSpecificStatements('EPV')}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                          >
-                            Load EPV Data (1 API call)
-                          </button>
-                        </div>
-                      )}
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2">Financial Data Required</h3>
+                        <p className="text-sm text-gray-600 mb-4">Please search for a company first to load financial data for EPV analysis</p>
+                      </div>
                     </div>
                   )
                 )}

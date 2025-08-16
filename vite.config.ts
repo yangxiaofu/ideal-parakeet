@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: process.env.NODE_ENV === 'production' ? '/ideal-parakeet/' : '/',
+  base: process.env.NODE_ENV === 'production' ? '/intrinsic-value-calculator/' : '/',
   test: {
     globals: true,
     environment: 'jsdom',

@@ -60,6 +60,7 @@ Husky + lint-staged automatically runs on git commit:
 - **Database**: Firestore for user data persistence
 - **External API**: Financial Modeling Prep for market data
 - **State Management**: React Query (TanStack Query) for server state
+- **Code Quality**: ESLint + TypeScript strict mode with Husky pre-commit hooks
 - **Routing**: React Router v7
 - **Charts**: Recharts for data visualization
 
@@ -224,6 +225,11 @@ The application requires these Firestore composite indexes for the calculations 
 3. `createdAt (desc)`
 
 These can be created automatically when first accessing the calculations feature, or manually via Firebase console.
+
+### Production Deployment
+The app is configured for GitHub Pages deployment:
+- Production base path: `/ideal-parakeet/` (configured in vite.config.ts)
+- Build output optimized for static hosting
 
 ## Testing Strategy
 
