@@ -18,14 +18,11 @@ jobs:
       with:
         node-version: '20'
         cache: 'npm'
-        cache-dependency-path: '02WIP/intrinsic-value-calculator/package-lock.json'
         
     - name: Install dependencies
-      working-directory: 02WIP/intrinsic-value-calculator
       run: npm ci
       
     - name: Build
-      working-directory: 02WIP/intrinsic-value-calculator
       run: npm run build
       env:
         # Add any environment variables needed for build
@@ -43,4 +40,4 @@ jobs:
       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./02WIP/intrinsic-value-calculator/dist
+        publish_dir: ./dist
