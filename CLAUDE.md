@@ -54,7 +54,7 @@ Husky + lint-staged automatically runs on git commit:
 ### Tech Stack
 - **Frontend Framework**: React 19 with TypeScript 5.8
 - **Build Tool**: Vite 7 with React plugin
-- **UI Components**: Tailwind CSS 4.x + shadcn/ui design system
+- **UI Components**: Tailwind CSS 3.x + shadcn/ui design system
 - **Testing**: Vitest with React Testing Library + jsdom
 - **Authentication**: Firebase Auth (email/password + Google OAuth)
 - **Database**: Firestore for user data persistence

@@ -270,5 +270,4 @@ class PeerDataService {
 // Export singleton instance
 export const peerDataService = new PeerDataService();
 
-// Export types for use in components
-export type { PeerDataResult, BatchFetchResult };
+// Types are already exported above as interfaces

@@ -5,7 +5,7 @@
  * Good capital allocation is essential for maintaining and growing competitive advantages.
  */
 
-import type { CompanyFinancials, IncomeStatement, BalanceSheet, CashFlowStatement } from '../types';
+import type { CompanyFinancials, BalanceSheet, CashFlowStatement } from '../types';
 import { type ROICAnalysis } from './roicCalculator';
 
 export type AllocationGrade = 'A' | 'B' | 'C' | 'D' | 'F';
@@ -123,7 +123,7 @@ export function assessCapitalAllocation(
   financials: CompanyFinancials,
   roicAnalysis: ROICAnalysis
 ): CapitalAllocationAssessment {
-  const { incomeStatement, balanceSheet, cashFlowStatement } = financials;
+  const { balanceSheet, cashFlowStatement } = financials;
   
   // Calculate metrics
   const reinvestmentRate = calculateReinvestmentRate(cashFlowStatement);
@@ -168,7 +168,7 @@ export function assessCapitalAllocation(
   } else if (incrementalROIC > roicAnalysis.averageROIC) {
     score += 20;
     strengths.push('New investments maintaining return levels');
-  } else if (incrementalROIC > roicAnalysis.currentWACC || 0.08) {
+  } else if (incrementalROIC > (roicAnalysis.currentWACC || 0.08)) {
     score += 15;
   } else {
     score += 5;

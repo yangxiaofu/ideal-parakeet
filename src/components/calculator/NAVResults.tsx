@@ -200,7 +200,7 @@ export const NAVResults: React.FC<NAVResultsProps> = ({ result, currentPrice }) 
             return (
               <button
                 key={tab.key}
-                onClick={() => setActiveTab(tab.key as string)}
+                onClick={() => setActiveTab(tab.key as "overview" | "assets" | "liabilities" | "quality" | "scenarios")}
                 className={`${
                   activeTab === tab.key
                     ? 'border-blue-500 text-blue-600'

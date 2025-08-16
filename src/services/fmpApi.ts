@@ -314,8 +314,8 @@ class FMPApiService {
         
         // ROIC calculation fields
         investedCapital: totalAssets - cash - (item.totalCurrentLiabilities || 0) + (item.shortTermDebt || 0),
-        returnOnAssets: item.netIncome ? item.netIncome / totalAssets : undefined,
-        returnOnEquity: item.netIncome ? item.netIncome / totalEquity : undefined
+        returnOnAssets: undefined, // Calculated from income statement data
+        returnOnEquity: undefined  // Calculated from income statement data
       };
     });
   }
