@@ -155,7 +155,7 @@ export function calculateLiquidationValue(
   customDiscount?: number
 ): LiquidationAnalysis {
   const discounts = DEFAULT_LIQUIDATION_DISCOUNTS[scenario];
-  const assetLiquidationValues: Record<string, number> = {};
+  const assetLiquidationValues: Record<string, { bookValue: number; liquidationValue: number; discount: number; marketability: "high" | "medium" | "low" }> = {};
   let totalLiquidationValue = 0;
   let totalBookValue = 0;
   
@@ -196,7 +196,7 @@ export function analyzeAssetQuality(
 ): AssetQualityAnalysis {
   let overallScore = 0;
   let totalWeight = 0;
-  const categoryScores: Record<string, { score: number; weight: number; confidence: number }> = {};
+  const categoryScores: Record<string, { score: number; weight: number; contribution: number }> = {};
   
   // Calculate asset ratios
   const totalAssets = balanceSheet.totalAssets;
@@ -591,7 +591,7 @@ export function calculateNAVSensitivity(
 
 function calculateAssetCategoryQuality(
   category: AssetCategory, 
-  adjustments: Array<{ amount: number; description: string }>
+  adjustments: Array<{ bookValue: number; adjustedValue: number; description: string; confidenceLevel?: 'high' | 'medium' | 'low' }>
 ): number {
   // Base quality score from predefined weights
   let baseScore = ASSET_QUALITY_WEIGHTS[category] * 100;

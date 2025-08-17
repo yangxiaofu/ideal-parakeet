@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Working Directory
 
-**IMPORTANT**: The active project is located in `02WIP/intrinsic-value-calculator/`. Always navigate to this directory for all development work.
+**IMPORTANT**: The active project is located in the root directory `/Users/fudong/Desktop/ideal-parakeet-clean/`. All development work should be done here, not in any subdirectories.
 
 ## Development Commands
 
@@ -67,12 +67,12 @@ Husky + lint-staged automatically runs on git commit:
 The application follows a feature-based architecture with clear separation of concerns:
 
 ```
-02WIP/intrinsic-value-calculator/src/
+src/
 ├── components/           # UI components organized by feature
 │   ├── auth/            # Authentication forms (LoginForm, RegisterForm)
 │   ├── calculator/      # Valuation calculators (DCF, DDM, Relative Valuation)
-│   ├── charts/          # Financial data visualizations
-│   ├── dashboard/       # Main dashboard components (FinancialHistoryTable, RecommendationBanner)
+│   ├── analysis/        # Financial analysis components (MoatAnalysis)
+│   ├── dashboard/       # Main dashboard components (FinancialHistoryTable)
 │   ├── layout/          # App layout (Header, ProtectedRoute)
 │   └── ui/              # Base components (button, card, input, selectable-input, badge, label, checkbox)
 ├── constants/           # Application constants
@@ -80,19 +80,24 @@ The application follows a feature-based architecture with clear separation of co
 │   └── industryPeers.ts # Industry peer company mappings
 ├── contexts/            # React contexts (AuthContext for user state)
 ├── hooks/               # Custom React hooks
+│   ├── useCalculationHistory.ts  # Hook for managing calculation history
 │   ├── useFinancialData.ts       # Hook for fetching company financial data
 │   ├── useMetricHighlighting.ts  # Hook for highlighting financial metrics
-│   └── usePeerData.ts            # Hook for peer company data management
+│   ├── usePeerData.ts            # Hook for peer company data management
+│   └── useSmartCalculator.ts     # Hook for smart calculator functionality
 ├── services/            # External service integrations
 │   ├── firebase.ts      # Firebase config and auth setup
 │   ├── fmpApi.ts        # Financial Modeling Prep API client
 │   └── peerDataService.ts # Peer company data service with batch fetching
+├── repositories/        # Data access layer
+│   └── CalculationRepository.ts # Repository for saved calculations
 ├── types/               # TypeScript type definitions
 │   ├── index.ts         # Core financial and valuation types
 │   ├── ddm.ts           # Dividend Discount Model types
 │   ├── epv.ts           # Earnings Power Value types
 │   ├── nav.ts           # Net Asset Value types
-│   └── relativeValuation.ts # Relative valuation types
+│   ├── relativeValuation.ts # Relative valuation types
+│   └── savedCalculation.ts # Saved calculation types
 ├── utils/               # Utility functions and calculators
 │   ├── dcfCalculator.ts # DCF valuation logic
 │   ├── ddmCalculator.ts # DDM valuation logic
@@ -102,6 +107,9 @@ The application follows a feature-based architecture with clear separation of co
 │   ├── financialDataHelpers.ts # Financial data transformation utilities
 │   ├── peerDataCache.ts # Caching for peer company data
 │   ├── formatters.ts    # Number/currency formatters
+│   ├── moatAnalysis.ts  # Economic moat analysis utilities
+│   ├── capitalAllocationScore.ts # Capital allocation scoring
+│   ├── dateFormatters.ts # Date formatting utilities
 │   └── cn.ts            # Tailwind className merger
 └── pages/               # Page-level components
     ├── AuthPage.tsx     # Login/Register page
@@ -156,7 +164,7 @@ Implemented calculators:
 
 ## Environment Configuration
 
-Required `.env` file in `02WIP/intrinsic-value-calculator/`:
+Required `.env` file in the root directory:
 ```env
 VITE_FIREBASE_API_KEY=
 VITE_FIREBASE_AUTH_DOMAIN=
@@ -231,15 +239,17 @@ npm run test:ui
 - NAV (Net Asset Value) calculator with asset breakdown
 - EPV (Earnings Power Value) calculator with normalized earnings
 - Relative valuation with peer comparison
+- Economic moat analysis functionality
 - Custom hooks for data fetching and UI interactions
 - Peer data caching system with batch fetching
 - Component testing infrastructure with comprehensive test coverage
 - Husky pre-commit hooks with lint-staged integration
 - Calculator tabs system for easy navigation between models
+- Calculation history and persistence with repositories
 
 ### 🚧 In Progress
 - Financial charts implementation with Recharts
-- Saved analysis functionality with Firestore
+- Advanced analysis features
 
 ### 📋 Planned
 - Scenario planning (bull/base/bear cases)
@@ -248,3 +258,4 @@ npm run test:ui
 - Advanced charting features
 - Mobile responsiveness optimization
 - Performance optimizations for large datasets
+- Use KISS, DRY, SOLID, SoC principles in my coding.

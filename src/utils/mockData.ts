@@ -22,6 +22,7 @@ export const getMockCompanyData = (ticker: string): CompanyFinancials => {
           sellingGeneralAndAdministrative: 10000000000,
           operatingExpenses: 15000000000,
           ebitda: 30000000000,
+          ebitdaratio: 0.3,
           interestExpense: 1000000000,
           incomeTaxExpense: 4000000000,
           effectiveTaxRate: 0.2
@@ -39,6 +40,7 @@ export const getMockCompanyData = (ticker: string): CompanyFinancials => {
           sellingGeneralAndAdministrative: 9500000000,
           operatingExpenses: 14000000000,
           ebitda: 27000000000,
+          ebitdaratio: 0.3,
           interestExpense: 900000000,
           incomeTaxExpense: 3600000000,
           effectiveTaxRate: 0.2
@@ -56,6 +58,7 @@ export const getMockCompanyData = (ticker: string): CompanyFinancials => {
           sellingGeneralAndAdministrative: 9000000000,
           operatingExpenses: 13000000000,
           ebitda: 24000000000,
+          ebitdaratio: 0.3,
           interestExpense: 800000000,
           incomeTaxExpense: 3200000000,
           effectiveTaxRate: 0.21

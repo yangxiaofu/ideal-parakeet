@@ -29,7 +29,7 @@ export interface IncomeStatement {
   incomeTaxExpense?: number; // For NOPAT calculation
   effectiveTaxRate?: number; // incomeTaxExpense / incomeBeforeTax
   
-  // Index signature for compatibility with Record<string, unknown>
+  // Index signature for compatibility
   [key: string]: unknown;
 }
 
@@ -91,7 +91,7 @@ export interface CashFlowStatement {
   freeCashFlow: number;
   dividendsPaid: number;
   
-  // Index signature for compatibility with Record<string, unknown>
+  // Index signature for compatibility
   [key: string]: unknown;
 }
 

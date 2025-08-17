@@ -127,7 +127,7 @@ export function calculateGrowthRate(
  * @param incomeStatements Array of income statements
  * @returns Growth rate as decimal (0.15 = 15%), defaults to 10% if invalid data
  */
-export function calculateRevenueGrowthRate(incomeStatements: Record<string, unknown>[]): number {
+export function calculateRevenueGrowthRate(incomeStatements: { date: string; revenue: number }[]): number {
   if (!incomeStatements || incomeStatements.length < 2) {
     return 0.10; // Default 10% growth
   }
@@ -169,7 +169,7 @@ export function calculateRevenueGrowthRate(incomeStatements: Record<string, unkn
  * @param cashFlowStatements Array of cash flow statements
  * @returns True if the company has paid dividends
  */
-export function hasDividends(cashFlowStatements: Record<string, unknown>[]): boolean {
+export function hasDividends(cashFlowStatements: { dividendsPaid: number }[]): boolean {
   if (!cashFlowStatements || cashFlowStatements.length === 0) return false;
   
   return cashFlowStatements.some(

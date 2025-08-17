@@ -512,9 +512,9 @@ export const Dashboard: React.FC = () => {
                   latestNetIncome={financialData.latestNetIncome}
                   latestTotalAssets={financialData.latestTotalAssets}
                   latestTotalEquity={financialData.latestTotalEquity}
-                  latestIncomeStatement={financialData.latestIncomeStatement!}
-                  latestBalanceSheet={financialData.latestBalanceSheet!}
-                  latestCashFlowStatement={financialData.latestCashFlowStatement!}
+                  latestIncomeStatement={(financialData.latestIncomeStatement as unknown as Record<string, unknown>) || {}}
+                  latestBalanceSheet={(financialData.latestBalanceSheet as unknown as Record<string, unknown>) || {}}
+                  latestCashFlowStatement={(financialData.latestCashFlowStatement as unknown as Record<string, unknown>) || {}}
                 />
               )}
               

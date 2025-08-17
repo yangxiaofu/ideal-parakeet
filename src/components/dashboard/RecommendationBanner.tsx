@@ -1,7 +1,7 @@
 import React from 'react';
 import { formatCurrency } from '../../utils/formatters';
 import { getRecommendedCalculators } from '../../constants/calculatorInfo';
-import type { CompanyFinancials, IncomeStatement, BalanceSheet, CashFlowStatement } from '../../types';
+import type { CompanyFinancials } from '../../types';
 
 interface RecommendationBannerProps {
   companyData: CompanyFinancials;
@@ -10,9 +10,9 @@ interface RecommendationBannerProps {
   latestNetIncome: number;
   latestTotalAssets: number;
   latestTotalEquity: number;
-  latestIncomeStatement: IncomeStatement;
-  latestBalanceSheet: BalanceSheet;
-  latestCashFlowStatement: CashFlowStatement;
+  latestIncomeStatement: Record<string, unknown>;
+  latestBalanceSheet: Record<string, unknown>;
+  latestCashFlowStatement: Record<string, unknown>;
 }
 
 export const RecommendationBanner: React.FC<RecommendationBannerProps> = ({
@@ -40,10 +40,10 @@ export const RecommendationBanner: React.FC<RecommendationBannerProps> = ({
     
     if (calc === 'DCF' && latestCashFlowStatement) {
       const prevIndex = companyData.cashFlowStatement.findIndex(
-        cf => new Date(cf.date) < new Date(latestCashFlowStatement.date)
+        cf => new Date(cf.date) < new Date(latestCashFlowStatement.date as string)
       );
       const prevFcf = prevIndex >= 0 ? companyData.cashFlowStatement[prevIndex]?.freeCashFlow : null;
-      const growth = prevFcf ? ((latestFCF - prevFcf) / Math.abs(prevFcf) * 100) : 0;
+      const growth = prevFcf && typeof prevFcf === 'number' ? ((latestFCF - prevFcf) / Math.abs(prevFcf) * 100) : 0;
       
       return {
         reason,
@@ -61,7 +61,7 @@ export const RecommendationBanner: React.FC<RecommendationBannerProps> = ({
     }
     
     if (calc === 'DDM' && latestDividend > 0) {
-      const shares = latestIncomeStatement?.sharesOutstanding || 0;
+      const shares = (latestIncomeStatement?.sharesOutstanding as number) || 0;
       const dps = shares ? latestDividend / shares : 0;
       
       return {
@@ -75,8 +75,8 @@ export const RecommendationBanner: React.FC<RecommendationBannerProps> = ({
     }
     
     if (calc === 'NAV' && latestBalanceSheet) {
-      const nav = latestTotalAssets - (latestBalanceSheet.totalLiabilities || 0);
-      const bookValue = latestBalanceSheet.bookValuePerShare;
+      const nav = latestTotalAssets - ((latestBalanceSheet.totalLiabilities as number) || 0);
+      const bookValue = latestBalanceSheet.bookValuePerShare as number;
       
       return {
         reason,
@@ -89,8 +89,10 @@ export const RecommendationBanner: React.FC<RecommendationBannerProps> = ({
     }
     
     if (calc === 'EPV' && latestIncomeStatement) {
-      const margin = latestIncomeStatement.revenue 
-        ? (latestIncomeStatement.operatingIncome / latestIncomeStatement.revenue * 100) 
+      const revenue = latestIncomeStatement.revenue as number;
+      const operatingIncome = latestIncomeStatement.operatingIncome as number;
+      const margin = revenue 
+        ? (operatingIncome / revenue * 100) 
         : 0;
       
       return {
