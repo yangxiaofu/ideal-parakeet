@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Working Directory
 
-**IMPORTANT**: The active project is located in the root directory `/Users/fudong/Desktop/ideal-parakeet-clean/`. All development work should be done here, not in any subdirectories.
+**IMPORTANT**: The active project is located in the root directory `/Users/fudong/Library/CloudStorage/GoogleDrive-fudaviddong@gmail.com/My Drive/1.GG-Projects/00 Active/ideal-parakeet-clean/`. All development work should be done here, not in any subdirectories.
 
 ## Development Commands
 
@@ -52,8 +52,8 @@ Husky + lint-staged automatically runs on git commit:
 ## Architecture Overview
 
 ### Tech Stack
-- **Frontend Framework**: React 19 with TypeScript 5.8
-- **Build Tool**: Vite 7 with React plugin
+- **Frontend Framework**: React 19.1 with TypeScript 5.8
+- **Build Tool**: Vite 7.0 with React plugin
 - **UI Components**: Tailwind CSS 3.x + shadcn/ui design system
 - **Testing**: Vitest with React Testing Library + jsdom
 - **Authentication**: Firebase Auth (email/password + Google OAuth)
@@ -110,6 +110,10 @@ src/
 │   ├── moatAnalysis.ts  # Economic moat analysis utilities
 │   ├── capitalAllocationScore.ts # Capital allocation scoring
 │   ├── dateFormatters.ts # Date formatting utilities
+│   ├── roicCalculator.ts # Return on Invested Capital calculations
+│   ├── mockData.ts      # Mock data for development/testing
+│   ├── testMockData.ts  # Additional test mock data
+│   ├── debugHelper.ts   # Development debugging utilities
 │   └── cn.ts            # Tailwind className merger
 └── pages/               # Page-level components
     ├── AuthPage.tsx     # Login/Register page
@@ -177,13 +181,23 @@ VITE_FMP_API_KEY=
 VITE_FMP_API_URL=https://financialmodelingprep.com/api/v3
 ```
 
+## Deployment Configuration
+
+The application is configured for GitHub Pages deployment:
+- **Production Base Path**: `/ideal-parakeet/` (configured in vite.config.ts)
+- **Development Base Path**: `/` (root)
+- The base path is automatically set based on NODE_ENV
+
 ## Testing Strategy
 
 ### Test Setup
 - **Unit Tests**: Vitest for utility functions and calculators
 - **Component Tests**: React Testing Library for UI components
 - **Integration Tests**: End-to-end testing for calculator workflows
-- **Mocks**: Firebase and FMP API mocked in `setupTests.ts`
+- **Mocks**: Firebase Auth, Firestore, and FMP API comprehensively mocked in `setupTests.ts`
+  - Firebase Auth mock includes: `signInWithEmailAndPassword`, `createUserWithEmailAndPassword`, `signOut`, `signInWithPopup`, `updateProfile`
+  - Firestore mock includes: `collection`, `doc`, `getDoc`, `setDoc`, `updateDoc`, `deleteDoc`
+  - FMP API mock includes all service methods with custom error handling
 - **Coverage Target**: 80% for critical business logic
 
 ### Test File Patterns
@@ -231,21 +245,25 @@ npm run test:ui
 ## Current Development Status
 
 ### ✅ Implemented
-- Complete authentication system with Firebase
-- FMP API integration for financial data
+- Complete authentication system with Firebase (email/password + Google OAuth)
+- FMP API integration for financial data with comprehensive error handling
 - Dashboard with company search and financial history
-- DCF calculator with input form and results
-- DDM calculator with dividend analysis
+- DCF calculator with input form, results, and sensitivity analysis
+- DDM calculator with dividend analysis and growth projections  
 - NAV (Net Asset Value) calculator with asset breakdown
 - EPV (Earnings Power Value) calculator with normalized earnings
-- Relative valuation with peer comparison
-- Economic moat analysis functionality
+- Relative valuation with peer comparison (P/E, P/B, EV/EBITDA ratios)
+- Economic moat analysis functionality with scoring
+- Capital allocation scoring system
 - Custom hooks for data fetching and UI interactions
-- Peer data caching system with batch fetching
+- Peer data caching system with batch fetching (5-minute cache)
 - Component testing infrastructure with comprehensive test coverage
 - Husky pre-commit hooks with lint-staged integration
 - Calculator tabs system for easy navigation between models
 - Calculation history and persistence with repositories
+- ROIC (Return on Invested Capital) calculations
+- Comprehensive mock data and debugging utilities
+- GitHub Pages deployment configuration
 
 ### 🚧 In Progress
 - Financial charts implementation with Recharts
