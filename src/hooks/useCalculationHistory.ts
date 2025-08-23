@@ -105,9 +105,14 @@ export function useAutoSaveCalculation() {
         calculationKeys.symbol(user.uid, calculation.symbol)
       );
 
+      // Generate a temporary ID that won't conflict with Firestore auto-IDs
+      // Firestore auto-IDs are 20 characters long and use specific character set
+      // Our temp IDs use a different pattern to avoid conflicts
+      const tempId = `temp_optimistic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
       // Optimistically update to the new value
       const optimisticCalculation: SavedCalculation = {
-        id: `temp_${Date.now()}`,
+        id: tempId,
         userId: user.uid,
         symbol: calculation.symbol,
         companyName: calculation.companyName,
@@ -161,9 +166,14 @@ export function useAutoSaveCalculation() {
         }
       );
 
-      // Invalidate and refetch to ensure consistency
+      // Invalidate both symbol-specific and list queries to ensure consistency
       queryClient.invalidateQueries({
         queryKey: calculationKeys.symbol(user.uid, calculation.symbol)
+      });
+      
+      // Also invalidate the global list query used by history panel
+      queryClient.invalidateQueries({
+        queryKey: calculationKeys.user(user.uid)
       });
     },
   });

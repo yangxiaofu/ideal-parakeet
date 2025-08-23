@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Check, Calculator, TrendingUp, BarChart3, DollarSign, Info } from 'lucide-react';
 import { CalculatorInfoCard } from './CalculatorInfoCard';
 import { getRecommendedCalculators } from '../../constants/calculatorInfo';
+import { useSmartMultiCalculator } from '../../services/CalculatorHookFactory';
 
 export type CalculatorModel = 'DCF' | 'DDM' | 'RELATIVE' | 'NAV' | 'EPV' | 'SUMMARY';
 
@@ -15,31 +16,30 @@ interface CalculatorTab {
   result?: number;
 }
 
-// Enhanced calculator result metadata interface
-interface CalculatorResultMetadata {
-  value: number;
-  timestamp: Date;
-  confidence?: 'high' | 'medium' | 'low';
-  fromCache?: boolean;
-  cacheAge?: string;
-}
 
 interface CalculatorTabsProps {
   activeTab: CalculatorModel;
   onTabChange: (tab: CalculatorModel) => void;
-  completedCalculators: Set<CalculatorModel>;
-  results: Partial<Record<CalculatorModel, CalculatorResultMetadata>>;
+  symbol: string;
   companyData?: Record<string, unknown>; // For smart recommendations
 }
 
 export const CalculatorTabs: React.FC<CalculatorTabsProps> = ({
   activeTab,
   onTabChange,
-  completedCalculators,
-  results,
+  symbol,
   companyData
 }) => {
   const [infoCardOpen, setInfoCardOpen] = useState<string | null>(null);
+  
+  // Get smart calculator states for completion tracking
+  const smartCalculators = useSmartMultiCalculator(symbol, {
+    DCF: () => {},
+    DDM: () => {},
+    NAV: () => {},
+    EPV: () => {},
+    RELATIVE: () => {}
+  });
   
   // Get recommendations if company data is available
   const recommendations = companyData ? getRecommendedCalculators(companyData) : null;
@@ -50,17 +50,17 @@ export const CalculatorTabs: React.FC<CalculatorTabsProps> = ({
       description: 'Discounted Cash Flow',
       icon: <TrendingUp className="h-4 w-4" />,
       available: true,
-      completed: completedCalculators.has('DCF'),
-      result: results.DCF?.value
+      completed: smartCalculators.DCF.isCacheAvailable,
+      result: typeof smartCalculators.DCF.cachedResult === 'number' ? smartCalculators.DCF.cachedResult : undefined
     },
     {
       id: 'DDM',
       name: 'DDM',
       description: 'Dividend Discount',
       icon: <DollarSign className="h-4 w-4" />,
-      available: true, // Now available!
-      completed: completedCalculators.has('DDM'),
-      result: results.DDM?.value
+      available: true,
+      completed: smartCalculators.DDM.isCacheAvailable,
+      result: typeof smartCalculators.DDM.cachedResult === 'number' ? smartCalculators.DDM.cachedResult : undefined
     },
     {
       id: 'RELATIVE',
@@ -68,33 +68,33 @@ export const CalculatorTabs: React.FC<CalculatorTabsProps> = ({
       description: 'Peer Multiples',
       icon: <BarChart3 className="h-4 w-4" />,
       available: false, // Deactivated - reduces API calls
-      completed: completedCalculators.has('RELATIVE'),
-      result: results.RELATIVE?.value
+      completed: smartCalculators.RELATIVE.isCacheAvailable,
+      result: typeof smartCalculators.RELATIVE.cachedResult === 'number' ? smartCalculators.RELATIVE.cachedResult : undefined
     },
     {
       id: 'NAV',
       name: 'NAV',
       description: 'Net Asset Value',
       icon: <BarChart3 className="h-4 w-4" />,
-      available: true, // Now available!
-      completed: completedCalculators.has('NAV'),
-      result: results.NAV?.value
+      available: true,
+      completed: smartCalculators.NAV.isCacheAvailable,
+      result: typeof smartCalculators.NAV.cachedResult === 'number' ? smartCalculators.NAV.cachedResult : undefined
     },
     {
       id: 'EPV',
       name: 'EPV',
       description: 'Earnings Power',
       icon: <Calculator className="h-4 w-4" />,
-      available: true, // Now available!
-      completed: completedCalculators.has('EPV'),
-      result: results.EPV?.value
+      available: true,
+      completed: smartCalculators.EPV.isCacheAvailable,
+      result: typeof smartCalculators.EPV.cachedResult === 'number' ? smartCalculators.EPV.cachedResult : undefined
     },
     {
       id: 'SUMMARY',
       name: 'Summary',
       description: 'Compare All',
       icon: <BarChart3 className="h-4 w-4" />,
-      available: completedCalculators.size > 0,
+      available: smartCalculators.hasAnyCachedResults,
       completed: false,
       result: undefined
     }
@@ -153,7 +153,7 @@ export const CalculatorTabs: React.FC<CalculatorTabsProps> = ({
             </div>
             
             {/* Result Badge */}
-            {tab.result !== undefined && (
+            {typeof tab.result === 'number' && !isNaN(tab.result) && (
               <span className={`ml-2 text-xs font-semibold ${
                 activeTab === tab.id ? 'text-gray-300' : 'text-gray-600'
               }`}>
@@ -191,20 +191,26 @@ export const CalculatorTabs: React.FC<CalculatorTabsProps> = ({
       </div>
       
       {/* Progress Indicator */}
-      {completedCalculators.size > 0 && (
-        <div className="px-4 pb-2">
-          <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
-            <span>Analysis Progress</span>
-            <span>{completedCalculators.size} of {tabs.filter(tab => tab.available && tab.id !== 'SUMMARY').length} models completed</span>
+      {smartCalculators.hasAnyCachedResults && (() => {
+        const completedCount = tabs.filter(tab => tab.completed && tab.id !== 'SUMMARY').length;
+        const totalCount = tabs.filter(tab => tab.available && tab.id !== 'SUMMARY').length;
+        const progressPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+        
+        return (
+          <div className="px-4 pb-2">
+            <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+              <span>Analysis Progress</span>
+              <span>{completedCount} of {totalCount} models completed</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-1.5">
+              <div 
+                className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                style={{ width: `${progressPercentage}%` }}
+              />
+            </div>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-1.5">
-            <div 
-              className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
-              style={{ width: `${(completedCalculators.size / tabs.filter(tab => tab.available && tab.id !== 'SUMMARY').length) * 100}%` }}
-            />
-          </div>
-        </div>
-      )}
+        );
+      })()}
       
       {/* Info Cards */}
       {infoCardOpen && (

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '../ui/card';
 import { DDMInputForm } from './DDMInputForm';
 import { DDMResults } from './DDMResults';
 import { calculateDDM } from '../../utils/ddmCalculator';
+import { useSmartDDMCalculator } from '../../services/CalculatorHookFactory';
 import type { DDMInputs, DDMResult } from '../../types/ddm';
 
 interface DDMCalculatorProps {
@@ -12,7 +13,14 @@ interface DDMCalculatorProps {
   defaultSharesOutstanding?: number;
   historicalDividends?: Array<{ year: string; value: number }>;
   historicalShares?: Array<{ year: string; value: number }>;
-  onCalculationComplete?: (intrinsicValue: number) => void;
+  onCalculationComplete?: (
+    intrinsicValue: number, 
+    metadata?: {
+      confidence?: 'high' | 'medium' | 'low';
+      fromCache?: boolean;
+      cacheAge?: string;
+    }
+  ) => void;
 }
 
 export const DDMCalculator: React.FC<DDMCalculatorProps> = ({
@@ -24,23 +32,59 @@ export const DDMCalculator: React.FC<DDMCalculatorProps> = ({
   historicalShares = [],
   onCalculationComplete
 }) => {
+  // Smart calculator with auto-save and caching
+  const {
+    calculate: smartCalculate,
+    cachedResult,
+    isCacheAvailable,
+    isCalculationFresh,
+    cacheAge,
+    lastError
+  } = useSmartDDMCalculator(
+    symbol || '',
+    calculateDDM,
+    {
+      companyName: symbol ? `${symbol} Corporation` : undefined,
+      autoSave: true,
+      showCacheIndicators: true
+    }
+  );
+
   const [result, setResult] = useState<DDMResult | null>(null);
   const [lastInputs, setLastInputs] = useState<DDMInputs | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  const handleCalculate = (inputs: DDMInputs) => {
+  // Show cached result if available and fresh
+  useEffect(() => {
+    if (cachedResult && isCacheAvailable && isCalculationFresh) {
+      setResult(cachedResult);
+      
+      // Report the cached result to parent with metadata
+      if (onCalculationComplete) {
+        onCalculationComplete(cachedResult.intrinsicValuePerShare, {
+          confidence: 'medium',
+          fromCache: true,
+          cacheAge: cacheAge || undefined
+        });
+      }
+    }
+  }, [cachedResult, isCacheAvailable, isCalculationFresh, cacheAge, onCalculationComplete]);
+
+  const handleCalculate = async (inputs: DDMInputs) => {
     try {
-      setError(null);
-      const calculationResult = calculateDDM(inputs);
+      const calculationResult = await smartCalculate(inputs);
       setResult(calculationResult);
       setLastInputs(inputs);
       
-      // Notify parent component
+      // Report the result to parent with metadata
       if (onCalculationComplete) {
-        onCalculationComplete(calculationResult.intrinsicValuePerShare);
+        onCalculationComplete(calculationResult.intrinsicValuePerShare, {
+          confidence: 'medium',
+          fromCache: false,
+          cacheAge: undefined
+        });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Calculation failed');
+      console.error('DDM calculation failed:', err);
       setResult(null);
     }
   };
@@ -61,10 +105,10 @@ export const DDMCalculator: React.FC<DDMCalculatorProps> = ({
       </Card>
 
       {/* Error Display */}
-      {error && (
+      {lastError && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <p className="text-sm text-red-800">
-            <strong>Error:</strong> {error}
+            <strong>Error:</strong> {lastError.message}
           </p>
         </div>
       )}
@@ -85,7 +129,7 @@ export const DDMCalculator: React.FC<DDMCalculatorProps> = ({
       )}
 
       {/* Instructions for first-time users */}
-      {!result && !error && (
+      {!result && !lastError && (
         <Card>
           <CardContent className="pt-6">
             <div className="text-center py-8">

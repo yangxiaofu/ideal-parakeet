@@ -8,7 +8,7 @@ import {
   doc,
   getDocs,
   getDoc,
-  setDoc,
+  addDoc,
   deleteDoc,
   query,
   where,
@@ -19,6 +19,9 @@ import {
   type DocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
+import { errorHandler } from '../services/ErrorHandler';
+import { sanitizeForFirestore } from '../utils/firestoreHelpers';
+import { safeTimestampToDate } from '../utils/timestampHelpers';
 import type {
   SavedCalculation,
   SaveCalculationRequest,
@@ -88,19 +91,23 @@ export class FirestoreCalculationRepository implements ICalculationRepository {
     if (!doc.exists()) return null;
     
     const data = doc.data();
+    if (!data) return null;
+    
+    // Use utility function for safe timestamp conversion
+    
     return {
       id: id || doc.id,
-      userId: data.userId,
-      symbol: data.symbol,
-      companyName: data.companyName,
-      type: data.type,
-      inputs: data.inputs,
-      result: data.result,
-      createdAt: data.createdAt?.toDate() || new Date(),
-      updatedAt: data.updatedAt?.toDate() || new Date(),
-      dataSnapshot: data.dataSnapshot,
+      userId: data.userId || '',
+      symbol: data.symbol || '',
+      companyName: data.companyName || '',
+      type: data.type || '',
+      inputs: data.inputs || {},
+      result: data.result || {},
+      createdAt: safeTimestampToDate(data.createdAt),
+      updatedAt: safeTimestampToDate(data.updatedAt),
+      dataSnapshot: data.dataSnapshot || {},
       notes: data.notes,
-      tags: data.tags,
+      tags: data.tags || [],
     };
   }
 
@@ -110,7 +117,8 @@ export class FirestoreCalculationRepository implements ICalculationRepository {
   ): Record<string, unknown> {
     const now = Timestamp.now();
     
-    return {
+    // Create initial data structure
+    const data: Record<string, unknown> = {
       userId,
       symbol: calculation.symbol.toUpperCase(),
       companyName: calculation.companyName,
@@ -119,10 +127,13 @@ export class FirestoreCalculationRepository implements ICalculationRepository {
       result: calculation.result,
       createdAt: now,
       updatedAt: now,
-      dataSnapshot: calculation.dataSnapshot || {},
+      dataSnapshot: calculation.dataSnapshot,
       notes: calculation.notes,
-      tags: calculation.tags || [],
+      tags: calculation.tags,
     };
+    
+    // Sanitize data to prevent Firestore undefined field errors
+    return sanitizeForFirestore(data);
   }
 
   async save<T extends CalculationInputs>(
@@ -133,19 +144,26 @@ export class FirestoreCalculationRepository implements ICalculationRepository {
       throw new Error('User ID is required for saving calculations');
     }
 
-    // Generate unique ID based on symbol, type, and timestamp
-    const timestamp = Date.now();
-    const calculationId = `${calculation.symbol}_${calculation.type}_${timestamp}`;
-    
-    const docRef = this.getDocRef(userId, calculationId);
+    // Use Firestore auto-generated IDs to prevent collisions
+    const collectionRef = this.getCollectionRef(userId);
     const firestoreData = this.convertToFirestore(userId, calculation);
     
     try {
-      await setDoc(docRef, firestoreData);
-      return calculationId;
+      const docRef = await addDoc(collectionRef, firestoreData);
+      errorHandler.logSuccess(`Saved calculation with ID: ${docRef.id} for ${calculation.symbol} ${calculation.type}`, {
+        operation: 'save',
+        userId,
+        symbol: calculation.symbol,
+        calculationType: calculation.type,
+      });
+      return docRef.id;
     } catch (error) {
-      console.error('Failed to save calculation:', error);
-      throw new Error(`Failed to save calculation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw errorHandler.handleRepositoryError(error, {
+        operation: 'save calculation',
+        userId,
+        symbol: calculation.symbol,
+        calculationType: calculation.type,
+      });
     }
   }
 
@@ -159,8 +177,11 @@ export class FirestoreCalculationRepository implements ICalculationRepository {
       const docSnap = await getDoc(docRef);
       return this.convertFromFirestore(docSnap, calculationId);
     } catch (error) {
-      console.error('Failed to load calculation:', error);
-      throw new Error(`Failed to load calculation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw errorHandler.handleRepositoryError(error, {
+        operation: 'load calculation',
+        userId,
+        metadata: { calculationId },
+      });
     }
   }
 
@@ -190,8 +211,66 @@ export class FirestoreCalculationRepository implements ICalculationRepository {
         .map(doc => this.convertFromFirestore(doc))
         .filter((calc): calc is SavedCalculation => calc !== null);
     } catch (error) {
-      console.error('Failed to load calculations by symbol:', error);
-      throw new Error(`Failed to load calculations: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Handle Firestore index missing errors gracefully
+      if (error instanceof Error && error.message.includes('index')) {
+        errorHandler.logWarning('Firestore index not available for loadBySymbol. Falling back to basic query.', {
+          operation: 'loadBySymbol',
+          userId,
+          symbol,
+        });
+        
+        try {
+          // Fallback: Get all calculations for symbol without ordering
+          const collectionRef = this.getCollectionRef(userId);
+          const basicQuery = query(
+            collectionRef,
+            where('symbol', '==', symbol.toUpperCase())
+            // No orderBy to avoid index requirement
+          );
+          
+          const querySnap = await getDocs(basicQuery);
+          const calculations = querySnap.docs
+            .map(doc => this.convertFromFirestore(doc))
+            .filter((calc): calc is SavedCalculation => calc !== null)
+            .sort((a, b) => {
+              // Sort by the requested field or default to createdAt
+              const orderBy = options.orderBy || 'createdAt';
+              const direction = options.orderDirection || 'desc';
+              
+              let aValue: any = a[orderBy as keyof SavedCalculation];
+              let bValue: any = b[orderBy as keyof SavedCalculation];
+              
+              // Handle date objects
+              if (aValue instanceof Date) aValue = aValue.getTime();
+              if (bValue instanceof Date) bValue = bValue.getTime();
+              
+              if (direction === 'desc') {
+                return bValue > aValue ? 1 : bValue < aValue ? -1 : 0;
+              } else {
+                return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+              }
+            });
+          
+          // Apply limit if specified
+          const limitedCalculations = options.limit ? calculations.slice(0, options.limit) : calculations;
+          
+          return limitedCalculations;
+        } catch (fallbackError) {
+          errorHandler.logWarning('Fallback query for loadBySymbol also failed, returning empty array', {
+            operation: 'loadBySymbol-fallback',
+            userId,
+            symbol,
+          });
+          // Return empty array instead of throwing to allow app to continue
+          return [];
+        }
+      }
+      
+      throw errorHandler.handleRepositoryError(error, {
+        operation: 'load calculations by symbol',
+        userId,
+        symbol,
+      });
     }
   }
 
@@ -205,39 +284,68 @@ export class FirestoreCalculationRepository implements ICalculationRepository {
     }
 
     try {
+      // Use simpler query strategy to avoid composite index requirements
+      // Strategy: Query by symbol first, then filter by type client-side
       const collectionRef = this.getCollectionRef(userId);
       const q = query(
         collectionRef,
-        where('symbol', '==', symbol.toUpperCase()),
-        where('type', '==', type),
-        orderBy('createdAt', 'desc'),
-        limit(1)
+        where('symbol', '==', symbol.toUpperCase())
+        // No multiple where clauses + orderBy to avoid composite index requirement
       );
 
       const querySnap = await getDocs(q);
       if (querySnap.empty) return null;
 
-      const doc = querySnap.docs[0];
-      return this.convertFromFirestore(doc);
+      // Filter by type and find the most recent calculation client-side
+      const calculations = querySnap.docs
+        .map(doc => this.convertFromFirestore(doc))
+        .filter((calc): calc is SavedCalculation => calc !== null && calc.type === type)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()); // Sort by newest first
+
+      return calculations.length > 0 ? calculations[0] : null;
     } catch (error) {
-      console.error('Failed to load calculation by type:', error);
-      
-      // Handle Firestore index missing errors gracefully
+      // Handle any remaining errors with the simplified fallback
       if (error instanceof Error && error.message.includes('index')) {
-        console.warn('Firestore index not available yet. Falling back to client-side filtering.');
+        errorHandler.logWarning('Firestore index issue with loadByType. Using client-side filtering.', {
+          operation: 'loadByType',
+          userId,
+          symbol,
+          metadata: { type },
+        });
         
-        // Fallback: Get all calculations for symbol and filter client-side
         try {
-          const symbolCalculations = await this.loadBySymbol(userId, symbol, { limit: 50 });
-          const filteredByType = symbolCalculations.filter(calc => calc.type === type);
-          return filteredByType.length > 0 ? filteredByType[0] : null;
+          // Ultimate fallback: Get ALL user calculations and filter completely client-side
+          const collectionRef = this.getCollectionRef(userId);
+          const allQuery = query(collectionRef); // No filters at all
+          
+          const allSnap = await getDocs(allQuery);
+          const filteredCalculations = allSnap.docs
+            .map(doc => this.convertFromFirestore(doc))
+            .filter((calc): calc is SavedCalculation => 
+              calc !== null && 
+              calc.symbol === symbol.toUpperCase() && 
+              calc.type === type
+            )
+            .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+          
+          return filteredCalculations.length > 0 ? filteredCalculations[0] : null;
         } catch (fallbackError) {
-          console.error('Fallback query also failed:', fallbackError);
-          return null; // Return null instead of throwing to allow app to continue
+          errorHandler.logWarning('All fallback queries failed for loadByType', {
+            operation: 'loadByType-ultimate-fallback',
+            userId,
+            symbol,
+            metadata: { type },
+          });
+          return null; // Give up gracefully
         }
       }
       
-      throw new Error(`Failed to load calculation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw errorHandler.handleRepositoryError(error, {
+        operation: 'load calculation by type',
+        userId,
+        symbol,
+        calculationType: type,
+      });
     }
   }
 
@@ -252,41 +360,145 @@ export class FirestoreCalculationRepository implements ICalculationRepository {
 
     try {
       const collectionRef = this.getCollectionRef(userId);
+      
+      // Use simplified query strategy to avoid complex composite indexes
+      // Strategy: Start with basic query and apply filters client-side when needed
       let q = query(collectionRef);
+      
+      // Only apply one filter at database level to avoid composite index requirements
+      const hasMultipleFilters = Object.keys(filter).filter(key => filter[key as keyof CalculationFilter] !== undefined).length > 1;
+      
+      if (!hasMultipleFilters) {
+        // Safe to apply single filters
+        if (filter.symbol) {
+          q = query(q, where('symbol', '==', filter.symbol.toUpperCase()));
+        } else if (filter.type) {
+          q = query(q, where('type', '==', filter.type));
+        } else if (filter.createdAfter) {
+          q = query(q, where('createdAt', '>=', Timestamp.fromDate(filter.createdAfter)));
+        } else if (filter.createdBefore) {
+          q = query(q, where('createdAt', '<=', Timestamp.fromDate(filter.createdBefore)));
+        }
 
-      // Apply filters
-      if (filter.symbol) {
-        q = query(q, where('symbol', '==', filter.symbol.toUpperCase()));
+        // Add ordering only if no complex filters
+        q = query(q, orderBy(options.orderBy || 'createdAt', options.orderDirection || 'desc'));
+        
+        if (options.limit && !hasMultipleFilters) {
+          q = query(q, limit(options.limit));
+        }
       }
-      if (filter.type) {
-        q = query(q, where('type', '==', filter.type));
-      }
-      if (filter.createdAfter) {
-        q = query(q, where('createdAt', '>=', Timestamp.fromDate(filter.createdAfter)));
-      }
-      if (filter.createdBefore) {
-        q = query(q, where('createdAt', '<=', Timestamp.fromDate(filter.createdBefore)));
-      }
-
-      // Apply ordering
-      q = query(q, orderBy(options.orderBy || 'createdAt', options.orderDirection || 'desc'));
-
-      // Apply pagination
-      if (options.startAfter) {
-        // This would require the actual document for startAfter - simplified for now
-        console.warn('Pagination startAfter not implemented in this version');
-      }
-      if (options.limit) {
-        q = query(q, limit(options.limit));
-      }
+      // For multiple filters, we'll get all documents and filter client-side
 
       const querySnap = await getDocs(q);
-      return querySnap.docs
+      let calculations = querySnap.docs
         .map(doc => this.convertFromFirestore(doc))
         .filter((calc): calc is SavedCalculation => calc !== null);
+
+      // Apply remaining filters client-side
+      if (hasMultipleFilters || (filter.symbol && Object.keys(filter).length > 1)) {
+        calculations = calculations.filter(calc => {
+          if (filter.symbol && calc.symbol !== filter.symbol.toUpperCase()) return false;
+          if (filter.type && calc.type !== filter.type) return false;
+          if (filter.createdAfter && calc.createdAt < filter.createdAfter) return false;
+          if (filter.createdBefore && calc.createdAt > filter.createdBefore) return false;
+          return true;
+        });
+      }
+
+      // Apply sorting client-side if we have multiple filters
+      if (hasMultipleFilters) {
+        const orderBy = options.orderBy || 'createdAt';
+        const direction = options.orderDirection || 'desc';
+        
+        calculations.sort((a, b) => {
+          let aValue: unknown = a[orderBy as keyof SavedCalculation];
+          let bValue: unknown = b[orderBy as keyof SavedCalculation];
+          
+          // Handle date objects
+          if (aValue instanceof Date) aValue = aValue.getTime();
+          if (bValue instanceof Date) bValue = bValue.getTime();
+          
+          if (direction === 'desc') {
+            return (bValue as number) > (aValue as number) ? 1 : (bValue as number) < (aValue as number) ? -1 : 0;
+          } else {
+            return (aValue as number) > (bValue as number) ? 1 : (aValue as number) < (bValue as number) ? -1 : 0;
+          }
+        });
+      }
+
+      // Apply limit client-side if needed
+      if (options.limit && (hasMultipleFilters || calculations.length > options.limit)) {
+        calculations = calculations.slice(0, options.limit);
+      }
+
+      return calculations;
     } catch (error) {
-      console.error('Failed to list calculations:', error);
-      throw new Error(`Failed to list calculations: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Handle index errors gracefully by falling back to basic query
+      if (error instanceof Error && error.message.includes('index')) {
+        errorHandler.logWarning('Firestore index issue with list. Falling back to basic query with client-side filtering.', {
+          operation: 'list',
+          userId,
+          metadata: { filter, options },
+        });
+        
+        try {
+          // Fallback: Get all user calculations and filter completely client-side
+          const collectionRef = this.getCollectionRef(userId);
+          const basicQuery = query(collectionRef);
+          
+          const querySnap = await getDocs(basicQuery);
+          let calculations = querySnap.docs
+            .map(doc => this.convertFromFirestore(doc))
+            .filter((calc): calc is SavedCalculation => calc !== null);
+
+          // Apply all filters client-side
+          calculations = calculations.filter(calc => {
+            if (filter.symbol && calc.symbol !== filter.symbol.toUpperCase()) return false;
+            if (filter.type && calc.type !== filter.type) return false;
+            if (filter.createdAfter && calc.createdAt < filter.createdAfter) return false;
+            if (filter.createdBefore && calc.createdAt > filter.createdBefore) return false;
+            return true;
+          });
+
+          // Apply sorting client-side
+          const orderBy = options.orderBy || 'createdAt';
+          const direction = options.orderDirection || 'desc';
+          
+          calculations.sort((a, b) => {
+            let aValue: unknown = a[orderBy as keyof SavedCalculation];
+            let bValue: unknown = b[orderBy as keyof SavedCalculation];
+            
+            if (aValue instanceof Date) aValue = aValue.getTime();
+            if (bValue instanceof Date) bValue = bValue.getTime();
+            
+            if (direction === 'desc') {
+              return (bValue as number) > (aValue as number) ? 1 : (bValue as number) < (aValue as number) ? -1 : 0;
+            } else {
+              return (aValue as number) > (bValue as number) ? 1 : (aValue as number) < (bValue as number) ? -1 : 0;
+            }
+          });
+
+          // Apply limit
+          if (options.limit) {
+            calculations = calculations.slice(0, options.limit);
+          }
+
+          return calculations;
+        } catch (fallbackError) {
+          errorHandler.logWarning('Fallback query also failed for list', {
+            operation: 'list-fallback',
+            userId,
+            metadata: { filter, options },
+          });
+          return []; // Return empty array to allow app to continue
+        }
+      }
+      
+      throw errorHandler.handleRepositoryError(error, {
+        operation: 'list calculations',
+        userId,
+        metadata: { filter, options },
+      });
     }
   }
 
@@ -336,20 +548,16 @@ export class FirestoreCalculationRepository implements ICalculationRepository {
     }
 
     try {
-      const batch = writeBatch(db);
+      // For batch operations, use individual save calls to get auto-generated IDs
+      // Firestore batch operations don't support addDoc, so we can't get auto-IDs in batches
       const calculationIds: string[] = [];
-
-      calculations.forEach(calculation => {
-        const timestamp = Date.now();
-        const calculationId = `${calculation.symbol}_${calculation.type}_${timestamp}`;
-        const docRef = this.getDocRef(userId, calculationId);
-        const firestoreData = this.convertToFirestore(userId, calculation);
-        
-        batch.set(docRef, firestoreData);
+      
+      for (const calculation of calculations) {
+        const calculationId = await this.save(userId, calculation);
         calculationIds.push(calculationId);
-      });
+      }
 
-      await batch.commit();
+      console.log(`✅ Batch saved ${calculationIds.length} calculations`);
       return calculationIds;
     } catch (error) {
       console.error('Failed to batch save calculations:', error);

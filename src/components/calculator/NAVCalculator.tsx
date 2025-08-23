@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NAVInputForm } from './NAVInputForm';
 import { NAVResults } from './NAVResults';
 import { calculateNAV } from '../../utils/navCalculator';
+import { useSmartNAVCalculator } from '../../services/CalculatorHookFactory';
 import type { NAVInputs, NAVResult } from '../../types/nav';
 import type { BalanceSheet } from '../../types';
 
@@ -10,7 +11,14 @@ interface NAVCalculatorProps {
   currentPrice?: number;
   balanceSheet?: BalanceSheet;
   sharesOutstanding?: number;
-  onCalculationComplete?: (navPerShare: number) => void;
+  onCalculationComplete?: (
+    navPerShare: number, 
+    metadata?: {
+      confidence?: 'high' | 'medium' | 'low';
+      fromCache?: boolean;
+      cacheAge?: string;
+    }
+  ) => void;
 }
 
 export const NAVCalculator: React.FC<NAVCalculatorProps> = ({ 
@@ -20,32 +28,65 @@ export const NAVCalculator: React.FC<NAVCalculatorProps> = ({
   sharesOutstanding,
   onCalculationComplete
 }) => {
+  // Smart calculator with auto-save and caching
+  const {
+    calculate: smartCalculate,
+    cachedResult,
+    isCacheAvailable,
+    isCalculationFresh,
+    cacheAge,
+    lastError
+  } = useSmartNAVCalculator(
+    symbol || '',
+    (inputs: NAVInputs) => calculateNAV(inputs, balanceSheet!),
+    {
+      companyName: symbol ? `${symbol} Corporation` : undefined,
+      autoSave: true,
+      showCacheIndicators: true
+    }
+  );
+
   const [result, setResult] = useState<NAVResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  // Show cached result if available and fresh
+  useEffect(() => {
+    if (cachedResult && isCacheAvailable && isCalculationFresh) {
+      setResult(cachedResult);
+      
+      // Report the cached result to parent with metadata
+      if (onCalculationComplete) {
+        onCalculationComplete(cachedResult.navPerShare, {
+          confidence: 'high', // NAV typically has high confidence
+          fromCache: true,
+          cacheAge: cacheAge || undefined
+        });
+      }
+    }
+  }, [cachedResult, isCacheAvailable, isCalculationFresh, cacheAge, onCalculationComplete]);
 
   const handleCalculate = async (inputs: NAVInputs) => {
     if (!balanceSheet) {
-      setError('Balance sheet data is required for NAV calculation');
+      console.error('Balance sheet data is required for NAV calculation');
       return;
     }
 
-    setLoading(true);
-    setError(null);
-    
     try {
-      const navResult = calculateNAV(inputs, balanceSheet);
+      setLoading(true);
       
-      // Store the result as is
+      const navResult = await smartCalculate(inputs);
       setResult(navResult);
       
-      // Report the result to parent
+      // Report the result to parent with metadata
       if (onCalculationComplete) {
-        onCalculationComplete(navResult.navPerShare);
+        onCalculationComplete(navResult.navPerShare, {
+          confidence: 'high',
+          fromCache: false,
+          cacheAge: undefined
+        });
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred during NAV calculation';
-      setError(errorMessage);
+      console.error('NAV calculation failed:', err);
       setResult(null);
     } finally {
       setLoading(false);
@@ -54,7 +95,6 @@ export const NAVCalculator: React.FC<NAVCalculatorProps> = ({
 
   const handleReset = () => {
     setResult(null);
-    setError(null);
   };
 
   if (!balanceSheet) {
@@ -126,7 +166,7 @@ export const NAVCalculator: React.FC<NAVCalculatorProps> = ({
       </div>
 
       {/* Error Display */}
-      {error && (
+      {lastError && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <div className="flex items-center">
             <div className="flex-shrink-0">
@@ -136,7 +176,7 @@ export const NAVCalculator: React.FC<NAVCalculatorProps> = ({
             </div>
             <div className="ml-3">
               <h3 className="text-sm font-medium text-red-800">Calculation Error</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
+              <p className="text-sm text-red-700 mt-1">{lastError.message}</p>
             </div>
           </div>
         </div>

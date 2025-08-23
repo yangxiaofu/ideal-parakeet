@@ -72,7 +72,7 @@ src/
 │   ├── auth/            # Authentication forms (LoginForm, RegisterForm)
 │   ├── calculator/      # Valuation calculators (DCF, DDM, Relative Valuation)
 │   ├── analysis/        # Financial analysis components (MoatAnalysis)
-│   ├── dashboard/       # Main dashboard components (FinancialHistoryTable)
+│   ├── dashboard/       # Dashboard components (CalculationHistoryPanel, CompanySearchForm, HistoryTable)
 │   ├── layout/          # App layout (Header, ProtectedRoute)
 │   └── ui/              # Base components (button, card, input, selectable-input, badge, label, checkbox)
 ├── constants/           # Application constants
@@ -81,6 +81,8 @@ src/
 ├── contexts/            # React contexts (AuthContext for user state)
 ├── hooks/               # Custom React hooks
 │   ├── useCalculationHistory.ts  # Hook for managing calculation history
+│   ├── useCompanySearch.ts       # Hook for company search functionality
+│   ├── useDashboardState.ts      # Hook for dashboard state management
 │   ├── useFinancialData.ts       # Hook for fetching company financial data
 │   ├── useMetricHighlighting.ts  # Hook for highlighting financial metrics
 │   ├── usePeerData.ts            # Hook for peer company data management
@@ -149,9 +151,13 @@ Implemented calculators:
 - **Relative Valuation**: Peer comparison using P/E, P/B, EV/EBITDA ratios
 
 ### Custom Hooks
+- `useCalculationHistory`: Manages calculation history state and persistence
+- `useCompanySearch`: Handles company search functionality with FMP API
+- `useDashboardState`: Manages dashboard state including filters and pagination
 - `useFinancialData`: Fetches and caches company financial data from FMP API
 - `useMetricHighlighting`: Provides visual highlighting for financial metrics
 - `usePeerData`: Manages peer company data with batch fetching and loading states
+- `useSmartCalculator`: Provides intelligent calculator functionality
 
 ### Caching Strategy
 - `peerDataCache.ts`: Implements in-memory caching for peer company data
@@ -247,7 +253,7 @@ npm run test:ui
 ### ✅ Implemented
 - Complete authentication system with Firebase (email/password + Google OAuth)
 - FMP API integration for financial data with comprehensive error handling
-- Dashboard with company search and financial history
+- Enhanced dashboard with company search, calculation history, and filtering
 - DCF calculator with input form, results, and sensitivity analysis
 - DDM calculator with dividend analysis and growth projections  
 - NAV (Net Asset Value) calculator with asset breakdown
@@ -255,12 +261,12 @@ npm run test:ui
 - Relative valuation with peer comparison (P/E, P/B, EV/EBITDA ratios)
 - Economic moat analysis functionality with scoring
 - Capital allocation scoring system
-- Custom hooks for data fetching and UI interactions
+- Comprehensive custom hooks for state management and API interactions
+- Calculation history panel with status tracking and filters
 - Peer data caching system with batch fetching (5-minute cache)
 - Component testing infrastructure with comprehensive test coverage
 - Husky pre-commit hooks with lint-staged integration
 - Calculator tabs system for easy navigation between models
-- Calculation history and persistence with repositories
 - ROIC (Return on Invested Capital) calculations
 - Comprehensive mock data and debugging utilities
 - GitHub Pages deployment configuration
@@ -277,3 +283,9 @@ npm run test:ui
 - Mobile responsiveness optimization
 - Performance optimizations for large datasets
 - Use KISS, DRY, SOLID, SoC principles in my coding.
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.

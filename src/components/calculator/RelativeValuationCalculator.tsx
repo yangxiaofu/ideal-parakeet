@@ -29,7 +29,14 @@ interface RelativeValuationCalculatorProps {
     cash: number;
   };
   suggestedPeers?: PeerCompany[];
-  onCalculationComplete?: (intrinsicValue: number) => void;
+  onCalculationComplete?: (
+    intrinsicValue: number, 
+    metadata?: {
+      confidence?: 'high' | 'medium' | 'low';
+      fromCache?: boolean;
+      cacheAge?: string;
+    }
+  ) => void;
 }
 
 export const RelativeValuationCalculator: React.FC<RelativeValuationCalculatorProps> = ({

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DCFInputForm } from './DCFInputForm';
 import { DCFResults } from './DCFResults';
 import { calculateDCFIntrinsicValue } from '../../utils/dcfCalculator';
-import { useSmartDCFCalculator } from '../../hooks/useSmartCalculator';
+import { useSmartDCFCalculator } from '../../services/CalculatorHookFactory';
 import type { DCFInputs, DCFResult } from '../../types';
 
 interface HistoricalValue {

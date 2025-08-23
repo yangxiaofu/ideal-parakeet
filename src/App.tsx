@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { PriceProvider } from './contexts/PriceContext';
 import { AuthPage } from './pages/AuthPage';
 import { Dashboard } from './pages/Dashboard';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
@@ -51,9 +52,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router>
-          <AppRoutes />
-        </Router>
+        <PriceProvider defaultFreshnessMinutes={15}>
+          <Router>
+            <AppRoutes />
+          </Router>
+        </PriceProvider>
       </AuthProvider>
       {/* React Query DevTools - only in development */}
       <ReactQueryDevtools initialIsOpen={false} />

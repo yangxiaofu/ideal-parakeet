@@ -6,6 +6,7 @@
 import { useCallback, useMemo, useEffect, useState } from 'react';
 import { useCalculationByType, useAutoSaveCalculation } from './useCalculationHistory';
 import { isCalculationFresh, CALCULATION_FRESHNESS_THRESHOLD } from '../types/savedCalculation';
+import { errorHandler } from '../services/ErrorHandler';
 import type {
   CalculationInputs,
   CalculatorType,
@@ -63,11 +64,14 @@ export function useSmartCalculator<TInputs extends CalculationInputs, TResult>(
   // Handle cache error gracefully
   useEffect(() => {
     if (cacheError) {
-      // Only log cache errors, don't set them as user-facing errors
-      console.warn('Cache loading failed:', cacheError);
-      // Don't set lastError for cache failures - they're not critical
+      // Cache errors are non-critical, so we just log them
+      errorHandler.handleCacheError(cacheError, {
+        operation: 'load cached calculation',
+        symbol,
+        calculationType: calculatorType,
+      });
     }
-  }, [cacheError]);
+  }, [cacheError, symbol, calculatorType]);
 
   // Calculate derived cache properties
   const cacheInfo = useMemo(() => {
@@ -99,11 +103,21 @@ export function useSmartCalculator<TInputs extends CalculationInputs, TResult>(
       // Perform the calculation
       const result = await calculator(inputs);
       
-      // Auto-save if enabled
-      if (autoSave && symbol) {
+      // Auto-save with explicit validation
+      if (autoSave) {
+        // Validate prerequisites for saving
+        const trimmedSymbol = symbol?.trim();
+        if (!trimmedSymbol) {
+          errorHandler.logWarning('Cannot auto-save: No symbol provided', {
+            operation: 'auto-save validation',
+            calculationType: calculatorType,
+          });
+          return result; // Return result but don't save
+        }
+
         const calculationRequest: SaveCalculationRequest<TInputs> = {
-          symbol: symbol.toUpperCase(),
-          companyName,
+          symbol: trimmedSymbol.toUpperCase(),
+          companyName: companyName || `${trimmedSymbol} Corporation`,
           type: calculatorType,
           inputs,
           result,
@@ -113,18 +127,32 @@ export function useSmartCalculator<TInputs extends CalculationInputs, TResult>(
           },
         };
 
-        // Fire and forget - don't block UI on save
-        autoSaveMutation.mutate(calculationRequest, {
-          onError: (error) => {
-            console.warn('Failed to auto-save calculation:', error);
-            // Don't set lastError for auto-save failures to avoid interrupting user flow
-          }
-        });
+        // Explicit save with error handling (not fire-and-forget)
+        try {
+          await autoSaveMutation.mutateAsync(calculationRequest);
+          errorHandler.logSuccess(`Auto-saved calculation for ${trimmedSymbol} ${calculatorType}`, {
+            operation: 'auto-save',
+            symbol: trimmedSymbol,
+            calculationType: calculatorType,
+          });
+        } catch (saveError) {
+          errorHandler.handleCalculationError(saveError, {
+            operation: 'auto-save calculation',
+            symbol: trimmedSymbol,
+            calculationType: calculatorType,
+          });
+          // For now, don't interrupt user flow - calculation result is still returned
+          // TODO: Add user notification in next phase
+        }
       }
       
       return result;
     } catch (error) {
-      const calculationError = error instanceof Error ? error : new Error('Calculation failed');
+      const calculationError = errorHandler.handleCalculationError(error, {
+        operation: 'execute calculation',
+        symbol,
+        calculationType: calculatorType,
+      });
       setLastError(calculationError);
       throw calculationError;
     }
@@ -174,102 +202,9 @@ function getCacheAge(calculation: SavedCalculation): string {
   }
 }
 
-/**
- * Specialized hook for DCF calculations with DCF-specific optimizations
- */
-export function useSmartDCFCalculator(
-  symbol: string,
-  calculator: (inputs: any) => any,
-  options: SmartCalculatorOptions = {}
-) {
-  return useSmartCalculator('DCF', symbol, calculator, {
-    ...options,
-    companyName: options.companyName || `${symbol} Corporation`,
-  });
-}
+// NOTE: Specialized calculator hooks moved to CalculatorHookFactory.ts
+// This reduces duplication and follows DRY principle
+// Import from there instead: import { useSmartDCFCalculator } from '../services/CalculatorHookFactory';
 
-/**
- * Specialized hook for DDM calculations
- */
-export function useSmartDDMCalculator(
-  symbol: string,
-  calculator: (inputs: any) => any,
-  options: SmartCalculatorOptions = {}
-) {
-  return useSmartCalculator('DDM', symbol, calculator, {
-    ...options,
-    companyName: options.companyName || `${symbol} Corporation`,
-  });
-}
-
-/**
- * Specialized hook for NAV calculations
- */
-export function useSmartNAVCalculator(
-  symbol: string,
-  calculator: (inputs: any) => any,
-  options: SmartCalculatorOptions = {}
-) {
-  return useSmartCalculator('NAV', symbol, calculator, {
-    ...options,
-    companyName: options.companyName || `${symbol} Corporation`,
-  });
-}
-
-/**
- * Specialized hook for EPV calculations
- */
-export function useSmartEPVCalculator(
-  symbol: string,
-  calculator: (inputs: any) => any,
-  options: SmartCalculatorOptions = {}
-) {
-  return useSmartCalculator('EPV', symbol, calculator, {
-    ...options,
-    companyName: options.companyName || `${symbol} Corporation`,
-  });
-}
-
-/**
- * Specialized hook for Relative Valuation calculations
- */
-export function useSmartRelativeValuationCalculator(
-  symbol: string,
-  calculator: (inputs: any) => any,
-  options: SmartCalculatorOptions = {}
-) {
-  return useSmartCalculator('RELATIVE', symbol, calculator, {
-    ...options,
-    companyName: options.companyName || `${symbol} Corporation`,
-  });
-}
-
-/**
- * Hook for managing multiple calculators for the same symbol
- * Useful for the dashboard that shows multiple valuation methods
- */
-export function useSmartMultiCalculator(
-  symbol: string,
-  calculators: Record<CalculatorType, (inputs: any) => any>,
-  options: SmartCalculatorOptions = {}
-) {
-  const dcf = useSmartDCFCalculator(symbol, calculators.DCF, options);
-  const ddm = useSmartDDMCalculator(symbol, calculators.DDM, options);
-  const nav = useSmartNAVCalculator(symbol, calculators.NAV, options);
-  const epv = useSmartEPVCalculator(symbol, calculators.EPV, options);
-  const relative = useSmartRelativeValuationCalculator(symbol, calculators.RELATIVE, options);
-
-  return {
-    DCF: dcf,
-    DDM: ddm,
-    NAV: nav,
-    EPV: epv,
-    RELATIVE: relative,
-    
-    // Aggregate states
-    isLoadingAnyCache: dcf.isLoadingCache || ddm.isLoadingCache || nav.isLoadingCache || epv.isLoadingCache || relative.isLoadingCache,
-    isSavingAny: dcf.isSaving || ddm.isSaving || nav.isSaving || epv.isSaving || relative.isSaving,
-    hasAnyCachedResults: dcf.isCacheAvailable || ddm.isCacheAvailable || nav.isCacheAvailable || epv.isCacheAvailable || relative.isCacheAvailable,
-    hasAnyErrors: !!(dcf.lastError || ddm.lastError || nav.lastError || epv.lastError || relative.lastError),
-  };
-}
+// NOTE: useSmartMultiCalculator moved to CalculatorHookFactory.ts to avoid circular dependencies
+// Import from there instead: import { useSmartMultiCalculator } from '../services/CalculatorHookFactory';

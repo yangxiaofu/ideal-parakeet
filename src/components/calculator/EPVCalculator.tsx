@@ -16,7 +16,14 @@ interface EPVCalculatorProps {
     revenue: number;
     date: string;
   }>;
-  onCalculationComplete?: (intrinsicValue: number) => void;
+  onCalculationComplete?: (
+    intrinsicValue: number, 
+    metadata?: {
+      confidence?: 'high' | 'medium' | 'low';
+      fromCache?: boolean;
+      cacheAge?: string;
+    }
+  ) => void;
 }
 
 export const EPVCalculator: React.FC<EPVCalculatorProps> = ({
