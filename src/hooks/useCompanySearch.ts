@@ -4,9 +4,11 @@
  */
 
 import { useState } from 'react';
-import { fmpApi, type CompanyBasicInfo } from '../services/fmpApi';
+import { type CompanyBasicInfo } from '../services/fmpApi';
 import { getMockCompanyData, isDemo } from '../utils/mockData';
 import { PeerDataCache } from '../utils/peerDataCache';
+import { FinancialDataCacheService } from '../services/FinancialDataCache';
+import { useAuth } from '../contexts/AuthContext';
 import type { CompanyFinancials } from '../types';
 
 interface UseCompanySearchResult {
@@ -23,26 +25,54 @@ interface UseCompanySearchResult {
   };
   handleSearch: (e: React.FormEvent) => Promise<void>;
   clearSearch: () => void;
+  /** Whether the data came from cache */
+  fromCache: boolean;
+  /** Force refresh cached data */
+  refreshData: () => Promise<void>;
 }
 
 export function useCompanySearch(): UseCompanySearchResult {
+  const { user } = useAuth();
   const [ticker, setTicker] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [basicInfo, setBasicInfo] = useState<CompanyBasicInfo | null>(null);
   const [companyData, setCompanyData] = useState<CompanyFinancials | null>(null);
+  const [fromCache, setFromCache] = useState(false);
   const [loadedStatements, setLoadedStatements] = useState<{
     income: boolean;
     balance: boolean;
     cashFlow: boolean;
   }>({ income: false, balance: false, cashFlow: false });
 
+  const cacheService = FinancialDataCacheService.getInstance();
+
   const clearSearch = () => {
     setTicker('');
     setError(null);
     setBasicInfo(null);
     setCompanyData(null);
+    setFromCache(false);
     setLoadedStatements({ income: false, balance: false, cashFlow: false });
+  };
+
+  const refreshData = async () => {
+    if (!user?.uid || !ticker.trim()) return;
+    
+    try {
+      setLoading(true);
+      const refreshedData = await cacheService.getCompanyData(user.uid, ticker.trim().toUpperCase(), {
+        forceRefresh: true,
+      });
+      setCompanyData(refreshedData);
+      setFromCache(false);
+      setLoadedStatements({ income: true, balance: true, cashFlow: true });
+    } catch (err) {
+      console.error('Failed to refresh company data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to refresh data');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -108,75 +138,42 @@ export function useCompanySearch(): UseCompanySearchResult {
         }
       }
       
-      // Check cache first
+      // Use smart financial data caching
       const tickerUpper = ticker.trim().toUpperCase();
-      console.log(`Checking cache for ticker: ${tickerUpper}`);
-      const cachedData = PeerDataCache.getCachedCompanyData(tickerUpper);
+      console.log(`Loading financial data with smart caching for: ${tickerUpper}`);
       
-      if (cachedData) {
-        console.log('Found cached data for ticker:', tickerUpper);
-        setCompanyData(cachedData);
-        setLoadedStatements({ income: true, balance: true, cashFlow: true });
-        setLoading(false);
-        return;
+      if (!user?.uid) {
+        throw new Error('User authentication required for financial data');
       }
 
-      // Search for company
-      console.log('Searching for company with FMP API...');
-      const searchResults = await fmpApi.searchCompany(tickerUpper);
-      console.log('Search results:', searchResults);
-      
-      if (!searchResults || searchResults.length === 0) {
-        throw new Error(`No company found for ticker: ${tickerUpper}`);
-      }
-
-      // Use the first result (exact match should be first)
-      const company = searchResults[0];
-      console.log('Selected company:', company);
-
-      // Get company profile for current price and shares outstanding
-      console.log('Getting company profile...');
-      const profile = await fmpApi.getCompanyProfile(company.symbol);
-      console.log('Profile data:', profile);
-      
-      if (!profile) {
-        throw new Error(`No profile data found for ${company.symbol}`);
-      }
-      const companyBasicInfo: CompanyBasicInfo = {
-        symbol: profile.symbol,
-        name: profile.name,
-        currentPrice: profile.price || 0,
-        sharesOutstanding: profile.sharesOutstanding || 0
-      };
-
-      setBasicInfo(companyBasicInfo);
-      console.log('Basic info set, starting financial data fetch...');
-      
-      // Load financial data in the background
       try {
-        const [incomeStatements, balanceSheets, cashFlowStatements] = await Promise.all([
-          fmpApi.getIncomeStatement(profile.symbol, 10),
-          fmpApi.getBalanceSheet(profile.symbol, 10), 
-          fmpApi.getCashFlowStatement(profile.symbol, 10)
-        ]);
+        // Get company data using smart cache (automatically handles cache/API logic)
+        const financialData = await cacheService.getCompanyData(user.uid, tickerUpper);
+        const wasCached = await cacheService.isCached(user.uid, tickerUpper);
 
-        const financialData: CompanyFinancials = {
-          symbol: profile.symbol,
-          name: profile.name,
-          currentPrice: profile.price || 0,
-          sharesOutstanding: companyBasicInfo.sharesOutstanding,
-          incomeStatement: incomeStatements || [],
-          balanceSheet: balanceSheets || [],
-          cashFlowStatement: cashFlowStatements || []
+        // Set basic info from financial data
+        const companyBasicInfo: CompanyBasicInfo = {
+          symbol: financialData.symbol,
+          name: financialData.name,
+          currentPrice: financialData.currentPrice || 0,
+          sharesOutstanding: financialData.sharesOutstanding || 0
         };
 
+        setBasicInfo(companyBasicInfo);
         setCompanyData(financialData);
+        setFromCache(wasCached);
         setLoadedStatements({ income: true, balance: true, cashFlow: true });
         
-        // Cache the data
-        PeerDataCache.setCachedCompanyData(profile.symbol, financialData);
+        // Also cache in PeerDataCache for backwards compatibility
+        PeerDataCache.setCachedCompanyData(tickerUpper, financialData);
         
-        console.log('Financial data loaded and cached successfully');
+        console.log('Financial data loaded successfully:', {
+          symbol: tickerUpper,
+          fromCache: wasCached,
+          hasIncomeData: financialData.incomeStatement.length > 0,
+          hasBalanceData: financialData.balanceSheet.length > 0,
+          hasCashFlowData: financialData.cashFlowStatement.length > 0,
+        });
       } catch (financialError) {
         console.error('Failed to load financial data:', financialError);
         setError(`Found company but failed to load financial data: ${financialError instanceof Error ? financialError.message : 'Unknown error'}`);
@@ -200,5 +197,7 @@ export function useCompanySearch(): UseCompanySearchResult {
     loadedStatements,
     handleSearch,
     clearSearch,
+    fromCache,
+    refreshData,
   };
 }
