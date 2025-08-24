@@ -29,6 +29,8 @@ interface UseCompanySearchResult {
   fromCache: boolean;
   /** Force refresh cached data */
   refreshData: () => Promise<void>;
+  /** Load company data from cache without API calls if possible */
+  loadFromCache: (symbol: string) => Promise<void>;
 }
 
 export function useCompanySearch(): UseCompanySearchResult {
@@ -187,6 +189,46 @@ export function useCompanySearch(): UseCompanySearchResult {
     }
   };
 
+  const loadFromCache = async (symbol: string) => {
+    if (!user?.uid) {
+      console.warn('User not authenticated - cannot load from cache');
+      return;
+    }
+
+    const symbolUpper = symbol.toUpperCase();
+    console.log(`Loading ${symbolUpper} from cache...`);
+    
+    try {
+      setLoading(true);
+      setTicker(symbolUpper);
+      setError(null);
+      
+      // Load from cache using existing service (cache-first, API-fallback)
+      const financialData = await cacheService.getCompanyData(user.uid, symbolUpper);
+      const wasCached = await cacheService.isCached(user.uid, symbolUpper);
+      
+      // Set basic info from financial data (same logic as handleSearch)
+      const companyBasicInfo: CompanyBasicInfo = {
+        symbol: financialData.symbol,
+        name: financialData.name,
+        currentPrice: financialData.currentPrice || 0,
+        sharesOutstanding: financialData.sharesOutstanding || 0
+      };
+      
+      setBasicInfo(companyBasicInfo);
+      setCompanyData(financialData);
+      setFromCache(wasCached);
+      setLoadedStatements({ income: true, balance: true, cashFlow: true });
+      
+      console.log(`Successfully loaded ${symbolUpper} (from cache: ${wasCached})`);
+    } catch (err) {
+      console.error(`Failed to load ${symbolUpper}:`, err);
+      setError(err instanceof Error ? err.message : 'Failed to load company data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     ticker,
     setTicker,
@@ -199,5 +241,6 @@ export function useCompanySearch(): UseCompanySearchResult {
     clearSearch,
     fromCache,
     refreshData,
+    loadFromCache,
   };
 }

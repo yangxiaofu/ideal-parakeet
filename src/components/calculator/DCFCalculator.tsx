@@ -38,6 +38,8 @@ export const DCFCalculator: React.FC<DCFCalculatorProps> = ({
 }) => {
   const [result, setResult] = useState<DCFResult | null>(null);
   const [showCachedResult, setShowCachedResult] = useState(false);
+  const [userRequestedReset, setUserRequestedReset] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   // Smart calculator with auto-save and caching
   const {
@@ -125,16 +127,29 @@ export const DCFCalculator: React.FC<DCFCalculatorProps> = ({
   };
 
   const handleReset = () => {
+    setIsResetting(true);
     setResult(null);
     setShowCachedResult(false);
+    setUserRequestedReset(true);
+    
+    // Add a small delay to show visual feedback
+    setTimeout(() => {
+      setIsResetting(false);
+    }, 200);
   };
 
-  // Auto-load cached result if available and fresh
+  // Auto-load cached result if available and fresh (but not after user requested reset)
   useEffect(() => {
-    if (isCacheAvailable && isCalculationFresh && !result && !showCachedResult) {
+    if (isCacheAvailable && isCalculationFresh && !result && !showCachedResult && !userRequestedReset) {
       handleUseCachedResult();
     }
-  }, [isCacheAvailable, isCalculationFresh, result, showCachedResult]);
+  }, [isCacheAvailable, isCalculationFresh, result, showCachedResult, userRequestedReset]);
+
+  // Reset the userRequestedReset flag when a new calculation is performed
+  const handleCalculateWithReset = async (inputs: DCFInputs) => {
+    setUserRequestedReset(false);
+    await handleCalculate(inputs);
+  };
 
   return (
     <div className="space-y-6">
@@ -152,9 +167,21 @@ export const DCFCalculator: React.FC<DCFCalculatorProps> = ({
         {result && (
           <button
             onClick={handleReset}
-            className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+            disabled={isResetting}
+            className={`px-4 py-2 text-sm rounded-md transition-colors ${
+              isResetting 
+                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
           >
-            Calculate Again
+            {isResetting ? (
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-500"></div>
+                <span>Resetting...</span>
+              </div>
+            ) : (
+              'Calculate Again'
+            )}
           </button>
         )}
       </div>
@@ -243,11 +270,16 @@ export const DCFCalculator: React.FC<DCFCalculatorProps> = ({
                 </div>
                 <button
                   onClick={handleReset}
-                  className={`text-xs underline ${
-                    isCalculationFresh ? 'text-green-700 hover:text-green-900' : 'text-yellow-700 hover:text-yellow-900'
+                  disabled={isResetting}
+                  className={`text-xs underline transition-colors ${
+                    isResetting 
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : isCalculationFresh 
+                        ? 'text-green-700 hover:text-green-900' 
+                        : 'text-yellow-700 hover:text-yellow-900'
                   }`}
                 >
-                  Recalculate with new data
+                  {isResetting ? 'Resetting...' : 'Recalculate with new data'}
                 </button>
               </div>
             </div>
@@ -285,7 +317,7 @@ export const DCFCalculator: React.FC<DCFCalculatorProps> = ({
       {/* Input Form */}
       {!result && (
         <DCFInputForm 
-          onSubmit={handleCalculate}
+          onSubmit={handleCalculateWithReset}
           loading={loading}
           initialValues={
             defaultBaseFCF && defaultSharesOutstanding

@@ -7,6 +7,11 @@ import { NAVCalculator } from '../components/calculator/NAVCalculator';
 import { EPVCalculator } from '../components/calculator/EPVCalculator';
 import { CalculatorTabs, type CalculatorModel } from '../components/calculator/CalculatorTabs';
 import { CalculatorSummary } from '../components/calculator/CalculatorSummary';
+import type { DCFResult } from '../types';
+import type { DDMResult } from '../types/ddm';
+import type { EPVResult } from '../types/epv';
+import type { NAVResult } from '../types/nav';
+import type { RelativeValuationResult } from '../types/relativeValuation';
 import { FinancialHistoryTable } from '../components/dashboard/FinancialHistoryTable';
 import { RecommendationBanner } from '../components/dashboard/RecommendationBanner';
 import { MoatAnalysis } from '../components/analysis/MoatAnalysis';
@@ -82,15 +87,16 @@ export const Dashboard: React.FC = () => {
   const highlightedMetrics = useMetricHighlighting(activeTab);
 
   // Handle calculation selection from history
-  const handleCalculationSelect = (calculation: SavedCalculation) => {
+  const handleCalculationSelect = async (calculation: SavedCalculation) => {
     setSelectedCalculationId(calculation.id);
     
-    // TODO: Load the calculation inputs into the active calculator
-    // This will be implemented as part of click-to-load workflow
-    console.log('Selected calculation:', calculation);
+    // Load full company data from cache (KISS principle - cache first, API fallback)
+    await companySearch.loadFromCache(calculation.symbol);
     
     // Switch to the appropriate calculator tab
     setActiveTab(calculation.type as CalculatorModel);
+    
+    console.log('Selected calculation:', calculation);
   };
 
   // Handle new search - clear selection when searching new company  
@@ -448,7 +454,7 @@ export const Dashboard: React.FC = () => {
                         results={[
                           smartCalculators.DCF.cachedResult && {
                             model: 'DCF' as CalculatorModel,
-                            intrinsicValue: smartCalculators.DCF.cachedResult as number,
+                            intrinsicValue: (smartCalculators.DCF.cachedResult as DCFResult)?.intrinsicValue ?? 0,
                             currentPrice: getCurrentPrice(),
                             confidence: 'medium' as const,
                             timestamp: smartCalculators.DCF.cachedCalculation?.createdAt || new Date(),
@@ -457,7 +463,7 @@ export const Dashboard: React.FC = () => {
                           },
                           smartCalculators.DDM.cachedResult && {
                             model: 'DDM' as CalculatorModel,
-                            intrinsicValue: smartCalculators.DDM.cachedResult as number,
+                            intrinsicValue: (smartCalculators.DDM.cachedResult as DDMResult)?.intrinsicValuePerShare ?? 0,
                             currentPrice: getCurrentPrice(),
                             confidence: 'medium' as const,
                             timestamp: smartCalculators.DDM.cachedCalculation?.createdAt || new Date(),
@@ -466,7 +472,7 @@ export const Dashboard: React.FC = () => {
                           },
                           smartCalculators.NAV.cachedResult && {
                             model: 'NAV' as CalculatorModel,
-                            intrinsicValue: smartCalculators.NAV.cachedResult as number,
+                            intrinsicValue: (smartCalculators.NAV.cachedResult as NAVResult)?.navPerShare ?? 0,
                             currentPrice: getCurrentPrice(),
                             confidence: 'medium' as const,
                             timestamp: smartCalculators.NAV.cachedCalculation?.createdAt || new Date(),
@@ -475,7 +481,7 @@ export const Dashboard: React.FC = () => {
                           },
                           smartCalculators.EPV.cachedResult && {
                             model: 'EPV' as CalculatorModel,
-                            intrinsicValue: smartCalculators.EPV.cachedResult as number,
+                            intrinsicValue: (smartCalculators.EPV.cachedResult as EPVResult)?.epvPerShare ?? 0,
                             currentPrice: getCurrentPrice(),
                             confidence: 'medium' as const,
                             timestamp: smartCalculators.EPV.cachedCalculation?.createdAt || new Date(),
@@ -484,7 +490,11 @@ export const Dashboard: React.FC = () => {
                           },
                           smartCalculators.RELATIVE.cachedResult && {
                             model: 'RELATIVE' as CalculatorModel,
-                            intrinsicValue: smartCalculators.RELATIVE.cachedResult as number,
+                            intrinsicValue: (() => {
+                              const result = smartCalculators.RELATIVE.cachedResult as RelativeValuationResult;
+                              const moderate = result?.valuationRanges?.moderate?.pricePerShare;
+                              return moderate ? (moderate.min + moderate.max) / 2 : 0;
+                            })(),
                             currentPrice: getCurrentPrice(),
                             confidence: 'medium' as const,
                             timestamp: smartCalculators.RELATIVE.cachedCalculation?.createdAt || new Date(),
