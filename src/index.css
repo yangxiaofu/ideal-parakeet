@@ -134,6 +134,12 @@
     box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -2px rgb(0 0 0 / 0.03);
     border-color: hsl(var(--primary) / 0.2);
   }
+
+  /* Z-Index Layer System for Consistent Modal Stacking */
+  .z-dropdown { z-index: 50; }      /* Dropdown menus */
+  .z-modal { z-index: 1000; }       /* Standard modals */
+  .z-modal-high { z-index: 10000; } /* High priority modals (billing, critical) */
+  .z-tooltip { z-index: 10; }       /* Tooltips and hints */
   
   /* Soft Gradient Overlays */
   .bg-gradient-minimal {
