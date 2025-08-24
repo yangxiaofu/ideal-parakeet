@@ -190,7 +190,7 @@ VITE_FMP_API_URL=https://financialmodelingprep.com/api/v3
 ## Deployment Configuration
 
 The application is configured for GitHub Pages deployment:
-- **Production Base Path**: `/ideal-parakeet/` (configured in vite.config.ts)
+- **Production Base Path**: `/bedrock-value/` (configured in vite.config.ts)
 - **Development Base Path**: `/` (root)
 - The base path is automatically set based on NODE_ENV
 

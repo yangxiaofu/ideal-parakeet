@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { SITE_BRANDING } from '../../constants/branding';
 
 export const Header: React.FC = () => {
   const { user, logout } = useAuth();
@@ -63,14 +64,14 @@ export const Header: React.FC = () => {
         <div className="flex justify-between items-center h-20">
           <div className="flex items-center space-x-2">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-2xl flex items-center justify-center">
-              <span className="text-white font-bold text-lg">IV</span>
+              <span className="text-white font-bold text-lg">{SITE_BRANDING.logoInitials}</span>
             </div>
             <div>
               <h1 className="text-xl font-semibold text-gray-800 tracking-tight">
-                Intrinsic Value
+                {SITE_BRANDING.name}
               </h1>
               <p className="text-xs text-gray-500">
-                Professional Valuation Tool
+                {SITE_BRANDING.tagline}
               </p>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { LoginForm } from '../components/auth/LoginForm';
 import { RegisterForm } from '../components/auth/RegisterForm';
+import { SITE_BRANDING } from '../constants/branding';
 
 export const AuthPage: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -12,10 +13,10 @@ export const AuthPage: React.FC = () => {
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900">
-            Intrinsic Value Calculator
+            {SITE_BRANDING.name}
           </h1>
           <p className="mt-2 text-sm text-gray-600">
-            Professional equity valuation made simple
+            {SITE_BRANDING.fullDescription}
           </p>
         </div>
         

@@ -1,4 +1,4 @@
-# Intrinsic Value Calculator Suite
+# BedRock Value
 
 A comprehensive, multi-model intrinsic valuation tool for publicly traded companies. This application provides professional-grade financial analysis with interactive charts, scenario planning, and persistent user accounts.
 
@@ -36,7 +36,7 @@ A comprehensive, multi-model intrinsic valuation tool for publicly traded compan
 
 1. **Clone and install dependencies**:
    ```bash
-   cd intrinsic-value-calculator
+   cd bedrock-value
    npm install
    ```
 
